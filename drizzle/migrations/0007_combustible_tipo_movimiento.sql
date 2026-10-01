@@ -1,0 +1,1 @@
+ALTER TABLE public.cargas_combustible_repartidor ADD COLUMN IF NOT EXISTS tipo_movimiento text NOT NULL DEFAULT 'egreso' CHECK (tipo_movimiento IN ('ingreso','egreso'));

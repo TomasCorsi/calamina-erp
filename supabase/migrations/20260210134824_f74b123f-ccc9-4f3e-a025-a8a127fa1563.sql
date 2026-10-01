@@ -1,0 +1,1 @@
+ALTER TABLE public.remitos ADD COLUMN row_color text DEFAULT NULL;

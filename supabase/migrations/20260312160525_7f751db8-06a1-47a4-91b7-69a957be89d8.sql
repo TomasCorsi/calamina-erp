@@ -1,0 +1,1 @@
+ALTER TABLE public.certificado_items ADD COLUMN observaciones text;

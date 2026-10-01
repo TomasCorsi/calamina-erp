@@ -1,0 +1,1 @@
+ALTER TABLE certificados ADD COLUMN incluir_iva boolean NOT NULL DEFAULT true;

@@ -1,0 +1,1 @@
+ALTER TABLE remitos ADD COLUMN precio_calc_mode text DEFAULT 'viajes';

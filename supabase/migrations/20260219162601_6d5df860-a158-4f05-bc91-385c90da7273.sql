@@ -1,0 +1,1 @@
+ALTER TABLE certificado_conceptos ADD COLUMN IF NOT EXISTS tipo text NOT NULL DEFAULT 'servicio';

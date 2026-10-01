@@ -1,0 +1,1 @@
+ALTER TABLE public.remitos DROP CONSTRAINT IF EXISTS remitos_numero_key;

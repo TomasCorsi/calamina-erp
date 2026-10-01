@@ -1,0 +1,3 @@
+ALTER TABLE public.sueldos
+  ADD COLUMN IF NOT EXISTS apellido TEXT,
+  ADD COLUMN IF NOT EXISTS puesto TEXT;

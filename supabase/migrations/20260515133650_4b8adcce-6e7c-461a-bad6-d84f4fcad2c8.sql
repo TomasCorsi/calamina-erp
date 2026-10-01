@@ -1,0 +1,1 @@
+ALTER TABLE public.remitos ADD COLUMN IF NOT EXISTS cliente_cantera text NULL;

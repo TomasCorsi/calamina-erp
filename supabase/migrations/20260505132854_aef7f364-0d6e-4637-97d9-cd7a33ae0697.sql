@@ -1,0 +1,2 @@
+ALTER TABLE public.certificados DROP CONSTRAINT IF EXISTS certificados_obra_id_periodo_key;
+ALTER TABLE public.certificados ADD COLUMN IF NOT EXISTS fecha_certificado DATE NOT NULL DEFAULT CURRENT_DATE;

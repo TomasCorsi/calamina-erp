@@ -1,0 +1,1 @@
+ALTER TABLE public.ordenes_compra ADD COLUMN IF NOT EXISTS numero_factura TEXT;

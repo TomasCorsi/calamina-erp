@@ -1,0 +1,1 @@
+ALTER TABLE public.personal ADD CONSTRAINT personal_numero_cuenta_unique UNIQUE (numero_cuenta);

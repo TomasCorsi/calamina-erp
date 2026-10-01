@@ -1,0 +1,472 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Calamina Sur - Industrial Dark Design System */
+
+@layer base {
+  :root {
+    /* Light mode (fallback, but dark is default) */
+    --background: 0 0% 6%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Industrial Red - Brand Color */
+    --primary: 348 100% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success/Warning states */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 15%;
+    --ring: 348 100% 35%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Industrial */
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 348 100% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 348 100% 35%;
+
+    /* Custom tokens */
+    --surface-elevated: 0 0% 12%;
+    --surface-overlay: 0 0% 8%;
+    --text-primary: 0 0% 98%;
+    --text-secondary: 0 0% 70%;
+    --text-muted: 0 0% 50%;
+    --divider: 0 0% 20%;
+    
+    /* Status colors */
+    --status-active: 142 76% 36%;
+    --status-pending: 38 92% 50%;
+    --status-inactive: 0 0% 45%;
+    --status-error: 0 84% 60%;
+  }
+
+  /* Light mode - when dark class is removed */
+  :root:not(.dark) {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 348 100% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 15%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 0% 90%;
+    --accent-foreground: 0 0% 15%;
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    --border: 0 0% 85%;
+    --input: 0 0% 90%;
+    --ring: 348 100% 40%;
+    --sidebar-background: 0 0% 96%;
+    --sidebar-foreground: 0 0% 30%;
+    --sidebar-primary: 348 100% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 92%;
+    --sidebar-accent-foreground: 0 0% 15%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 348 100% 40%;
+    --surface-elevated: 0 0% 100%;
+    --surface-overlay: 0 0% 98%;
+    --text-primary: 0 0% 10%;
+    --text-secondary: 0 0% 35%;
+    --text-muted: 0 0% 50%;
+    --divider: 0 0% 88%;
+    --status-active: 142 76% 36%;
+    --status-pending: 38 92% 50%;
+    --status-inactive: 0 0% 55%;
+    --status-error: 0 84% 50%;
+  }
+
+  .dark {
+    --background: 0 0% 6%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 348 100% 35%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 18%;
+    --input: 0 0% 15%;
+    --ring: 348 100% 35%;
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 348 100% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 348 100% 35%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply dark;
+    color-scheme: dark;
+  }
+
+  html:not(.dark) {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar for industrial feel */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+@layer components {
+  /* Industrial card style */
+  .card-industrial {
+    @apply bg-card border border-border rounded-lg;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Status badges */
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .status-active {
+    @apply bg-green-500/20 text-green-400 border border-green-500/30;
+  }
+
+  .status-pending {
+    @apply bg-yellow-500/20 text-yellow-400 border border-yellow-500/30;
+  }
+
+  .status-inactive {
+    @apply bg-gray-500/20 text-gray-400 border border-gray-500/30;
+  }
+
+  .status-error {
+    @apply bg-red-500/20 text-red-400 border border-red-500/30;
+  }
+
+  /* KPI Card */
+  .kpi-card {
+    @apply bg-card border border-border rounded-lg p-4 transition-all duration-200;
+  }
+
+  .kpi-card:hover {
+    @apply border-primary/50;
+    box-shadow: 0 0 20px rgba(176, 0, 32, 0.1);
+  }
+
+  /* Data table row hover */
+  .table-row-hover {
+    @apply transition-colors duration-150;
+  }
+
+  .table-row-hover:hover {
+    @apply bg-accent/50;
+  }
+
+  /* Glow effect for primary elements */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(176, 0, 32, 0.3);
+  }
+
+  /* Industrial button variants */
+  .btn-industrial {
+    @apply font-medium tracking-wide uppercase text-sm;
+  }
+}
+
+@layer utilities {
+  /* Text utilities */
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-primary to-red-400 bg-clip-text text-transparent;
+  }
+
+  /* Background patterns */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Fade animations */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.3s ease-out;
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Number font */
+  .font-mono-numbers {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* React Datasheet Grid - Context menu z-index fix (renders inside dialogs) */
+  .dsg-context-menu {
+    z-index: 9999 !important;
+    background-color: hsl(var(--popover)) !important;
+    color: hsl(var(--popover-foreground)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: 0.375rem !important;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+    padding: 4px !important;
+  }
+
+  .dsg-context-menu-item {
+    color: hsl(var(--popover-foreground)) !important;
+    border-radius: 0.25rem !important;
+    padding: 4px 12px !important;
+    font-size: 0.875rem !important;
+  }
+
+  .dsg-context-menu-item:hover {
+    background-color: hsl(var(--accent)) !important;
+    color: hsl(var(--accent-foreground)) !important;
+  }
+
+  /* React Datasheet Grid - Dark Theme (shared styles) */
+  .remitos-grid-container .dsg-container,
+  .combustible-grid-container .dsg-container {
+    --dsg-border-color: hsl(var(--border));
+    --dsg-selection-border-color: hsl(var(--primary));
+    --dsg-header-background-color: hsl(var(--muted));
+    --dsg-cell-background-color: hsl(var(--card));
+    --dsg-cell-text-color: hsl(var(--foreground));
+    --dsg-header-text-color: hsl(var(--muted-foreground));
+    background-color: hsl(var(--card));
+  }
+
+  .remitos-grid-container .dsg-row,
+  .combustible-grid-container .dsg-row {
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .remitos-grid-container .dsg-cell,
+  .combustible-grid-container .dsg-cell {
+    border-right: 1px solid hsl(var(--border));
+  }
+
+  .remitos-grid-container .dsg-cell:focus-within,
+  .combustible-grid-container .dsg-cell:focus-within {
+    box-shadow: inset 0 0 0 2px hsl(var(--primary));
+  }
+
+  .remitos-grid-container .dsg-header-cell,
+  .combustible-grid-container .dsg-header-cell {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+
+  .remitos-grid-container .dsg-header-cell-active,
+  .combustible-grid-container .dsg-header-cell-active {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--primary)) !important;
+    font-weight: 600;
+  }
+
+  .remitos-grid-container .dsg-add-row,
+  .combustible-grid-container .dsg-add-row {
+    background-color: hsl(var(--muted) / 0.5);
+    color: hsl(var(--muted-foreground));
+  }
+
+  .remitos-grid-container .dsg-add-row:hover,
+  .combustible-grid-container .dsg-add-row:hover {
+    background-color: hsl(var(--muted));
+  }
+
+  .remitos-grid-container .row-new,
+  .combustible-grid-container .row-new {
+    background-color: hsl(var(--success) / 0.1) !important;
+  }
+
+  .remitos-grid-container .row-modified,
+  .combustible-grid-container .row-modified {
+    background-color: hsl(var(--warning) / 0.1) !important;
+  }
+
+  .remitos-grid-container .row-deleted,
+  .combustible-grid-container .row-deleted {
+    background-color: hsl(var(--destructive) / 0.1) !important;
+    text-decoration: line-through;
+    opacity: 0.5;
+  }
+
+  .remitos-grid-container .dsg-cell-disabled,
+  .combustible-grid-container .dsg-cell-disabled {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .remitos-grid-container input,
+  .remitos-grid-container select,
+  .combustible-grid-container input,
+  .combustible-grid-container select {
+    background-color: transparent !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .remitos-grid-container input::placeholder,
+  .combustible-grid-container input::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Checkbox styling */
+  .remitos-grid-container input[type="checkbox"],
+  .combustible-grid-container input[type="checkbox"] {
+    accent-color: hsl(var(--primary));
+  }
+
+  /* Grid scrollbar styling */
+  .remitos-grid-container ::-webkit-scrollbar,
+  .combustible-grid-container ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .remitos-grid-container ::-webkit-scrollbar-track,
+  .combustible-grid-container ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 5px;
+  }
+
+  .remitos-grid-container ::-webkit-scrollbar-thumb,
+  .combustible-grid-container ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.5);
+    border-radius: 5px;
+  }
+
+  .remitos-grid-container ::-webkit-scrollbar-thumb:hover,
+  .combustible-grid-container ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary));
+  }
+
+  .remitos-grid-container ::-webkit-scrollbar-corner,
+  .combustible-grid-container ::-webkit-scrollbar-corner {
+    background: hsl(var(--muted));
+  }
+}
+
+  /* Row color classes for Remitos grid */
+  .remitos-grid-container .row-color-yellow .dsg-cell {
+    background-color: rgba(234, 179, 8, 0.15) !important;
+  }
+  .remitos-grid-container .row-color-green .dsg-cell {
+    background-color: rgba(34, 197, 94, 0.15) !important;
+  }
+  .remitos-grid-container .row-color-blue .dsg-cell {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+  }
+  .remitos-grid-container .row-color-orange .dsg-cell {
+    background-color: rgba(249, 115, 22, 0.15) !important;
+  }
+  .remitos-grid-container .row-color-red .dsg-cell {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+  }
+  .remitos-grid-container .row-color-violet .dsg-cell {
+    background-color: rgba(139, 92, 246, 0.15) !important;
+  }
+
+/* Loading bar animation */
+@keyframes loading-bar {
+  0% { width: 0%; margin-left: 0%; }
+  50% { width: 100%; margin-left: 0%; }
+  100% { width: 0%; margin-left: 100%; }
+}
+
+.animate-loading-bar {
+  animation: loading-bar 1.5s ease-in-out infinite;
+}

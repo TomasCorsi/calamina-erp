@@ -1,0 +1,1 @@
+ALTER TABLE public.partes_diarios ADD COLUMN km_camion numeric DEFAULT 0;

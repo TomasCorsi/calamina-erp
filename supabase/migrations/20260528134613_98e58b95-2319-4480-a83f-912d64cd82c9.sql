@@ -1,0 +1,1 @@
+ALTER TABLE public.orden_compra_items ADD COLUMN IF NOT EXISTS articulo TEXT;

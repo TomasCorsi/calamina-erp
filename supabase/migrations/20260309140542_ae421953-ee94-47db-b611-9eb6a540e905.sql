@@ -1,0 +1,1 @@
+ALTER TABLE public.remitos ADD COLUMN cliente_destino text;

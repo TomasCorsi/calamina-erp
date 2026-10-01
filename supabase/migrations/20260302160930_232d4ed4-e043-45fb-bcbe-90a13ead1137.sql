@@ -1,0 +1,1 @@
+ALTER TABLE public.remitos ALTER COLUMN obra_id DROP NOT NULL;

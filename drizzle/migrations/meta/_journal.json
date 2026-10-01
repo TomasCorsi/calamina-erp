@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787941752639,
+      "tag": "0000_add_anticipo_cotizaciones",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788270935243,
+      "tag": "0001_fix_invoke_edge_function_net_http_post",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788289954581,
+      "tag": "0002_tablero_realtime_publication",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788362505779,
+      "tag": "0003_create_tablero_sesiones",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788374348590,
+      "tag": "0004_create_cotizacion_anticipos",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789404920148,
+      "tag": "0005_rrhh_modulo_etapa1",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789759865434,
+      "tag": "0006_create_remito_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790772382094,
+      "tag": "0007_combustible_tipo_movimiento",
+      "breakpoints": true
+    }
+  ]
+}

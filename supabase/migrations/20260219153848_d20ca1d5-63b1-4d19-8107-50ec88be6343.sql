@@ -1,0 +1,1 @@
+ALTER TABLE certificado_items ADD COLUMN IF NOT EXISTS seccion text DEFAULT NULL;
