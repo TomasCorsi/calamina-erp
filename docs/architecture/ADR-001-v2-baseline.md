@@ -49,3 +49,23 @@ El gate de lint se reactivará cuando exista un boundary v2 o un baseline
 verificable que permita medir la deuda sin ocultarla. Hasta entonces, el script
 `npm run lint` se conserva y todo código v2 nuevo deberá tender a cumplir las
 reglas vigentes sin aumentar la deuda heredada.
+
+## Higiene de dependencias críticas
+
+En Fase 0B se actualizó `jspdf` de `4.0.0` a `4.2.1` para corregir
+vulnerabilidades de inyección y denegación de servicio publicadas para las
+versiones hasta `4.2.0`. La versión continúa siendo compatible con
+`jspdf-autotable` y con los imports y APIs utilizados por los generadores PDF
+existentes.
+
+Después de la actualización, `npm audit` informa 32 vulnerabilidades
+(2 low, 10 moderate y 20 high) y `npm audit --omit=dev` informa 29
+(2 low, 9 moderate y 18 high), sin vulnerabilidades critical en ninguno de los
+dos casos. Permanecen hallazgos high que requieren tratamiento separado, entre
+ellos routing (`react-router-dom`), archivos Excel (`xlsx`), dependencias de
+runtime transitivas y herramientas de build. La exposición real a inputs no
+confiables debe evaluarse antes de actualizar esos paquetes.
+
+No se utilizará `npm audit fix` ni `npm audit fix --force` como mecanismo
+automático: cada actualización se revisará por alcance, compatibilidad y riesgo
+funcional.
