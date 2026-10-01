@@ -142,7 +142,7 @@ export default function Mensajes() {
   const [plantillaPorVencer, setPlantillaPorVencer] = useState(
     "Hola {nombre}, tu registro de conducir vence el {fecha_vencimiento}. Te pedimos que gestiones la renovación."
   );
-  const APP_LINK = "https://gestion-de-obras.lovable.app";
+  const APP_LINK = window.location.origin;
   const [plantillaSinRegistro, setPlantillaSinRegistro] = useState(
     "Hola {nombre}, te escribimos de la empresa.\n\n" +
       "Tu legajo es: {legajo}\n\n" +

@@ -1,1 +1,2 @@
-project_id = "euytcvwhrhvtwvppvawd"
+# Local identifier only. This is not a staging or production project ref.
+project_id = "calamina-erp-v2-local"

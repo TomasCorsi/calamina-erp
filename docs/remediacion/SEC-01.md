@@ -1,4 +1,6 @@
-# Remediación SEC-01
+# LEGACY / REFERENCE — Remediación SEC-01
+
+> Documento histórico del sistema legacy; no es una migración base de ERP v2.
 
 ## Problema
 

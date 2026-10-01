@@ -1,4 +1,7 @@
-# Auditoría Técnica Integral
+# LEGACY / REFERENCE — Auditoría Técnica Integral
+
+> Documento histórico del sistema productivo heredado. No describe el baseline
+> ejecutable de CALAMINA ERP v2 ni autoriza conexiones al backend legacy.
 
 **Proyecto:** gestión de obras / Calamina Sur  
 **Fecha de corte:** 30 de septiembre de 2026  

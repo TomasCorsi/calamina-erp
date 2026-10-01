@@ -1,3 +1,9 @@
+/**
+ * LEGACY TYPES — reemplazar después del baseline v2.
+ *
+ * Se conservan temporalmente para que el frontend heredado pueda compilar.
+ * No representan el esquema objetivo de CALAMINA ERP v2.
+ */
 export type Json =
   | string
   | number

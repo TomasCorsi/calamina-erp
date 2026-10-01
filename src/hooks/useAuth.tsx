@@ -115,23 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     const initializeAuth = async () => {
       try {
-        const cachedUserId = (() => {
-          try {
-            const raw = localStorage.getItem(`sb-euytcvwhrhvtwvppvawd-auth-token`);
-            if (!raw) return null;
-            const parsed = JSON.parse(raw);
-            return parsed?.user?.id ?? null;
-          } catch { return null; }
-        })();
-
-        if (cachedUserId && isMounted) {
-          try {
-            const cp = localStorage.getItem(`offline_cache_profile_${cachedUserId}`);
-            if (cp) setProfile(JSON.parse(cp));
-            hydrateRolesFromCache(cachedUserId);
-          } catch {}
-        }
-
         const sessionResult = await raceWithTimeout(
           supabase.auth.getSession(),
           3000
@@ -145,17 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(resolvedSession);
           setUser(resolvedSession.user);
           await raceWithTimeout(fetchUserData(resolvedSession.user.id), 3000);
-        } else if (sessionResult === null && cachedUserId) {
-          try {
-            const raw = localStorage.getItem(`sb-euytcvwhrhvtwvppvawd-auth-token`);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (parsed?.user) {
-                setUser(parsed.user);
-                setSession(parsed);
-              }
-            }
-          } catch {}
         } else {
           setSession(null);
           setUser(null);

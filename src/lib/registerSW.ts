@@ -2,7 +2,6 @@
  * Service Worker registration with strict preview/dev guards.
  * Never registers in:
  * - dev mode
- * - Lovable preview iframes
  * - inside an iframe
  * - ?sw=off kill-switch URL
  */
@@ -11,20 +10,6 @@ function shouldSkipRegistration(): { skip: boolean; reason?: string } {
   if (typeof window === "undefined") return { skip: true, reason: "no window" };
   if (!import.meta.env.PROD) return { skip: true, reason: "dev mode" };
   if (window !== window.parent) return { skip: true, reason: "iframe" };
-
-  const host = window.location.hostname;
-  if (
-    host.startsWith("id-preview--") ||
-    host.startsWith("preview--") ||
-    host === "lovableproject.com" ||
-    host.endsWith(".lovableproject.com") ||
-    host === "lovableproject-dev.com" ||
-    host.endsWith(".lovableproject-dev.com") ||
-    host === "beta.lovable.dev" ||
-    host.endsWith(".beta.lovable.dev")
-  ) {
-    return { skip: true, reason: "lovable preview host" };
-  }
 
   if (new URLSearchParams(window.location.search).has("sw")) {
     const swParam = new URLSearchParams(window.location.search).get("sw");

@@ -1,4 +1,6 @@
-# SEC-02 — Registro seguro mediante invitaciones
+# LEGACY / REFERENCE — SEC-02 — Registro seguro mediante invitaciones
+
+> Documento histórico del sistema legacy; no es una migración base de ERP v2.
 
 > **ESTADO: EXPAND IMPLEMENTADO LOCALMENTE — NO DESPLEGADO**
 

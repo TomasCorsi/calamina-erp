@@ -64,19 +64,6 @@ registerRoute(
   ),
 );
 
-// Supabase REST API: NetworkFirst con timeout corto
-registerRoute(
-  ({ url }) => url.hostname.endsWith(".supabase.co") && url.pathname.startsWith("/rest/"),
-  new NetworkFirst({
-    cacheName: "supabase-api-cache",
-    networkTimeoutSeconds: 3,
-    plugins: [
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
-      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 }),
-    ],
-  }),
-);
-
 // Imágenes y fuentes: CacheFirst
 registerRoute(
   ({ request }) => request.destination === "image" || request.destination === "font",
