@@ -49,9 +49,32 @@ values (
 
 select set_config('request.jwt.claim.sub', '35000000-0000-4000-8000-000000000001', true);
 set local role authenticated;
-select is((select count(*) from public.profiles), 3::bigint, 'viewer should read every test profile');
+select is(
+  (
+    select count(*)
+    from public.profiles
+    where user_id in (
+      '35000000-0000-4000-8000-000000000001',
+      '35000000-0000-4000-8000-000000000002',
+      '35000000-0000-4000-8000-000000000003'
+    )
+  ),
+  3::bigint,
+  'viewer should read every test profile'
+);
 select is((select count(*) from public.personal), 3::bigint, 'viewer should read every personal row');
-select is((select count(*) from public.company_memberships), 2::bigint, 'viewer should read every membership');
+select is(
+  (
+    select count(*)
+    from public.company_memberships
+    where id in (
+      '35100000-0000-4000-8000-000000000001',
+      '35100000-0000-4000-8000-000000000002'
+    )
+  ),
+  2::bigint,
+  'viewer should read every test membership'
+);
 reset role;
 
 select set_config('request.jwt.claim.sub', '35000000-0000-4000-8000-000000000002', true);

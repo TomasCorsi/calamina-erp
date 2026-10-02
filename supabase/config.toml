@@ -4,7 +4,7 @@ project_id = "calamina-erp-v2-local"
 [api]
 enabled = true
 port = 54321
-schemas = ["public"]
+schemas = ["public", "api"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 

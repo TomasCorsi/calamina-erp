@@ -15,7 +15,8 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset --local",
-    "supabase:test": "supabase test db --local"
+    "supabase:test": "supabase test db --local",
+    "auth:bootstrap:local": "node scripts/bootstrap-local-admin.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
