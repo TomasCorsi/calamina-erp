@@ -1,0 +1,29 @@
+insert into iam.roles (id, key, name, description, is_system, is_assignable)
+values
+  ('10000000-0000-4000-8000-000000000001', 'admin', 'Administrador', 'Acceso total al catalogo IAM inicial.', true, false),
+  ('10000000-0000-4000-8000-000000000002', 'user_manager', 'Gestor de usuarios', 'Consulta usuarios, crea invitaciones y administra roles asignables.', true, true),
+  ('10000000-0000-4000-8000-000000000003', 'personal_manager', 'Gestor de personal', 'Consulta y administra registros de personal.', true, true),
+  ('10000000-0000-4000-8000-000000000004', 'viewer', 'Consulta', 'Consulta usuarios y personal sin permisos de modificacion.', true, true);
+
+insert into iam.permissions (id, key, description)
+values
+  ('20000000-0000-4000-8000-000000000001', 'users.view', 'Consultar perfiles y memberships de usuarios.'),
+  ('20000000-0000-4000-8000-000000000002', 'users.invite', 'Crear y revocar invitaciones de registro.'),
+  ('20000000-0000-4000-8000-000000000003', 'users.manage_roles', 'Asignar y retirar roles asignables.'),
+  ('20000000-0000-4000-8000-000000000004', 'personal.view', 'Consultar registros de personal.'),
+  ('20000000-0000-4000-8000-000000000005', 'personal.manage', 'Crear y modificar registros de personal.');
+
+insert into iam.role_permissions (role_id, permission_id)
+values
+  ('10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001'),
+  ('10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002'),
+  ('10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003'),
+  ('10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000004'),
+  ('10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000005'),
+  ('10000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001'),
+  ('10000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002'),
+  ('10000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000003'),
+  ('10000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000004'),
+  ('10000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000005'),
+  ('10000000-0000-4000-8000-000000000004', '20000000-0000-4000-8000-000000000001'),
+  ('10000000-0000-4000-8000-000000000004', '20000000-0000-4000-8000-000000000004');
