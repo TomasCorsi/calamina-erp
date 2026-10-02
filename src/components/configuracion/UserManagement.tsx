@@ -1,401 +1,135 @@
-import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Copy, Loader2, MailPlus, Search, Shield, UserCheck, Users } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Shield, Loader2, Link2, Unlink, Mail, KeyRound, Search } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { LinkUserDialog } from "./LinkUserDialog";
-import { ChangeEmailDialog } from "./ChangeEmailDialog";
-import { ChangePasswordDialog } from "./ChangePasswordDialog";
-import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/hooks/useAuth";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 
-type AppRole = "admin" | "capataz" | "maquinista" | "ayudante" | "remitero";
+type ManagedUser = { membership_id: string; user_id: string; display_name: string | null; email: string; membership_status: "active" | "suspended"; suspended_at: string | null; personal_id: string | null; personal_name: string | null; role_keys: string[] };
+type Role = { role_key: string; role_name: string };
+type Person = { id: string; internal_code: string; first_name: string; last_name: string; work_email: string | null };
+type Invitation = { invitation_id: string; email: string; role_key: string; personal_id: string | null; state: string; expires_at: string };
 
-interface PersonalRecord {
-  id: string;
-  legajo: string | null;
-  nombre: string | null;
-  apellido: string | null;
-  user_id: string | null;
-}
-
-interface UserWithRole {
-  user_id: string;
-  nombre_completo: string;
-  telefono: string | null;
-  created_at: string;
-  role: AppRole;
-  personal?: PersonalRecord | null;
-}
-
-const roleLabels: Record<AppRole, string> = {
-  admin: "Administrador",
-  capataz: "Capataz",
-  maquinista: "Maquinista",
-  ayudante: "Ayudante",
-  remitero: "Remitero",
-};
-
-const roleBadgeVariants: Record<AppRole, "default" | "secondary" | "outline" | "destructive"> = {
-  admin: "default",
-  capataz: "secondary",
-  maquinista: "outline",
-  ayudante: "destructive",
-  remitero: "secondary",
-};
+const roleLabels: Record<string, string> = { admin: "Administrador", user_manager: "Gestión de usuarios", personal_manager: "Gestión de personal", viewer: "Consulta" };
 
 export function UserManagement() {
-  const [users, setUsers] = useState<UserWithRole[]>([]);
-  const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
+  const { permissions, user: currentUser } = useAuth();
+  const canView = permissions.has("users.view");
+  const canInvite = permissions.has("users.invite");
+  const canManageRoles = permissions.has("users.manage_roles");
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  
-  // Link dialog state
-  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
-  const [selectedUserForLink, setSelectedUserForLink] = useState<{ id: string; name: string } | null>(null);
-  
-  // Unlink dialog state
-  const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
-  const [selectedUserForUnlink, setSelectedUserForUnlink] = useState<{ id: string; name: string } | null>(null);
-  const [isUnlinking, setIsUnlinking] = useState(false);
+  const [search, setSearch] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [roleKey, setRoleKey] = useState("");
+  const [personalId, setPersonalId] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [roleSelections, setRoleSelections] = useState<Record<string, string>>({});
 
-  // Change email dialog state
-  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [selectedUserForEmail, setSelectedUserForEmail] = useState<{ id: string; name: string } | null>(null);
-
-  // Change password dialog state
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [selectedUserForPassword, setSelectedUserForPassword] = useState<{ id: string; name: string } | null>(null);
-
-  const fetchData = async () => {
-    try {
-      // Fetch profiles and roles
-      const [profilesRes, rolesRes, personalRes] = await Promise.all([
-        supabase.from("profiles").select("user_id, nombre_completo, telefono, created_at"),
-        supabase.from("user_roles").select("user_id, role"),
-        supabase.from("personal").select("id, legajo, nombre, apellido, user_id"),
-      ]);
-
-      if (profilesRes.error) throw profilesRes.error;
-      if (rolesRes.error) throw rolesRes.error;
-      if (personalRes.error) throw personalRes.error;
-
-      const profiles = profilesRes.data || [];
-      const roles = rolesRes.data || [];
-      const personal = personalRes.data || [];
-
-      setPersonalRecords(personal);
-
-      // Map users with their roles and linked personal records
-      const usersWithRoles: UserWithRole[] = profiles.map((profile) => {
-        const userRole = roles.find((r) => r.user_id === profile.user_id);
-        const linkedPersonal = personal.find((p) => p.user_id === profile.user_id);
-        
-        return {
-          ...profile,
-          role: (userRole?.role as AppRole) || "maquinista",
-          personal: linkedPersonal || null,
-        };
-      });
-
-      setUsers(usersWithRoles);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Error al cargar datos");
-    } finally {
-      setLoading(false);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [usersResult, rolesResult, invitationResult, peopleResult] = await Promise.all([
+      canView ? supabase.schema("api").rpc("list_users") : Promise.resolve({ data: [], error: null }),
+      canInvite || canManageRoles ? supabase.schema("api").rpc("assignable_roles") : Promise.resolve({ data: [], error: null }),
+      canInvite ? supabase.schema("api").rpc("list_registration_invitations") : Promise.resolve({ data: [], error: null }),
+      canInvite ? supabase.schema("api").rpc("list_invitable_personal") : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (usersResult.error || rolesResult.error || invitationResult.error || peopleResult.error) toast.error("No se pudo actualizar la gestión de usuarios");
+    else {
+      setUsers(Array.isArray(usersResult.data) ? usersResult.data as ManagedUser[] : []);
+      const availableRoles = Array.isArray(rolesResult.data) ? rolesResult.data as Role[] : [];
+      setRoles(availableRoles);
+      setRoleKey((current) => current || availableRoles[0]?.role_key || "");
+      setInvitations(Array.isArray(invitationResult.data) ? invitationResult.data as Invitation[] : []);
+      setPeople(Array.isArray(peopleResult.data) ? peopleResult.data as Person[] : []);
     }
-  };
+    setLoading(false);
+  }, [canInvite, canManageRoles, canView]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Available personal for linking (not linked to any user)
-  const availablePersonal = useMemo(() => {
-    return personalRecords.filter((p) => !p.user_id);
-  }, [personalRecords]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const filteredUsers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter((u) => {
-      const haystack = [
-        u.nombre_completo,
-        u.telefono,
-        u.personal?.legajo,
-        u.personal?.nombre,
-        u.personal?.apellido,
-        u.personal ? `${u.personal.nombre ?? ""} ${u.personal.apellido ?? ""}` : "",
-        roleLabels[u.role],
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [users, searchQuery]);
+    const term = search.trim().toLocaleLowerCase("es");
+    if (!term) return users;
+    return users.filter((managedUser) => [managedUser.display_name, managedUser.email, managedUser.personal_name, ...managedUser.role_keys].filter(Boolean).join(" ").toLocaleLowerCase("es").includes(term));
+  }, [search, users]);
 
-  const handleRoleChange = async (userId: string, newRole: AppRole) => {
-    setUpdatingUserId(userId);
-    try {
-      const { error } = await supabase
-        .from("user_roles")
-        .update({ role: newRole })
-        .eq("user_id", userId);
-
-      if (error) throw error;
-
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.user_id === userId ? { ...user, role: newRole } : user
-        )
-      );
-
-      toast.success(`Rol actualizado a ${roleLabels[newRole]}`);
-    } catch (error) {
-      console.error("Error updating role:", error);
-      toast.error("Error al actualizar el rol");
-    } finally {
-      setUpdatingUserId(null);
-    }
+  const createInvitation = async (event: FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setInviteUrl("");
+    const { data, error } = await supabase.functions.invoke("create-registration-invitation", { body: { email: email.trim(), role_key: roleKey, personal_id: personalId || null } });
+    setSubmitting(false);
+    if (error || !data?.invite_url) return toast.error("No se pudo crear la invitación");
+    setInviteUrl(data.invite_url);
+    toast.success("Invitación creada");
+    await loadData();
   };
 
-  const openLinkDialog = (userId: string, userName: string) => {
-    setSelectedUserForLink({ id: userId, name: userName });
-    setLinkDialogOpen(true);
+  const revokeInvitation = async (invitationId: string) => {
+    const { error } = await supabase.functions.invoke("revoke-registration-invitation", { body: { invitation_id: invitationId } });
+    if (error) return toast.error("No se pudo revocar la invitación");
+    toast.success("Invitación revocada");
+    await loadData();
   };
 
-  const openUnlinkDialog = (userId: string, userName: string) => {
-    setSelectedUserForUnlink({ id: userId, name: userName });
-    setUnlinkDialogOpen(true);
+  const changeMembershipStatus = async (managedUser: ManagedUser) => {
+    const nextStatus = managedUser.membership_status === "active" ? "suspended" : "active";
+    const { error } = await supabase.schema("api").rpc("set_membership_status", { p_membership_id: managedUser.membership_id, p_status: nextStatus });
+    if (error) return toast.error("No se pudo cambiar el estado de la membresía");
+    toast.success(nextStatus === "active" ? "Membresía reactivada" : "Membresía suspendida");
+    await loadData();
   };
 
-  const handleUnlink = async () => {
-    if (!selectedUserForUnlink) return;
-    
-    setIsUnlinking(true);
-    try {
-      const { error } = await supabase
-        .from("personal")
-        .update({ user_id: null })
-        .eq("user_id", selectedUserForUnlink.id);
-
-      if (error) throw error;
-
-      toast.success("Vinculación eliminada correctamente");
-      await fetchData();
-      setUnlinkDialogOpen(false);
-    } catch (error) {
-      console.error("Error unlinking user:", error);
-      toast.error("Error al desvincular usuario");
-    } finally {
-      setIsUnlinking(false);
-    }
+  const assignRole = async (managedUser: ManagedUser) => {
+    const available = roles.filter((candidate) => !managedUser.role_keys.includes(candidate.role_key));
+    const selected = available.some((candidate) => candidate.role_key === roleSelections[managedUser.membership_id]) ? roleSelections[managedUser.membership_id] : available[0]?.role_key;
+    if (!selected) return;
+    const { error } = await supabase.schema("api").rpc("assign_user_role", { p_membership_id: managedUser.membership_id, p_role_key: selected });
+    if (error) return toast.error("No se pudo asignar el rol");
+    toast.success("Rol asignado");
+    await loadData();
   };
 
-  if (loading) {
-    return (
-      <Card className="card-industrial">
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        </CardContent>
-      </Card>
-    );
-  }
+  const removeRole = async (managedUser: ManagedUser, roleKeyToRemove: string) => {
+    const { error } = await supabase.schema("api").rpc("remove_user_role", { p_membership_id: managedUser.membership_id, p_role_key: roleKeyToRemove });
+    if (error) return toast.error("No se pudo quitar el rol");
+    toast.success("Rol quitado");
+    await loadData();
+  };
 
-  return (
-    <>
-      <Card className="card-industrial lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Gestión de Usuarios
-          </CardTitle>
-          <CardDescription>
-            Administra los usuarios y sus roles en el sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="relative mb-4 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, teléfono, legajo o rol..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <div className="rounded-md border border-border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead className="text-muted-foreground">Usuario</TableHead>
-                  <TableHead className="text-muted-foreground">Teléfono</TableHead>
-                  <TableHead className="text-muted-foreground">Registro</TableHead>
-                  <TableHead className="text-muted-foreground">Legajo</TableHead>
-                  <TableHead className="text-muted-foreground">Rol</TableHead>
-                  <TableHead className="text-muted-foreground text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      {users.length === 0 ? "No hay usuarios registrados" : "No se encontraron usuarios"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <TableRow key={user.user_id} className="border-border hover:bg-muted/50">
-                      <TableCell className="font-medium">{user.nombre_completo}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {user.telefono || "-"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {format(new Date(user.created_at), "dd/MM/yyyy")}
-                      </TableCell>
-                      <TableCell>
-                        {user.personal ? (
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="font-mono">
-                              {user.personal.legajo || "S/N"}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground truncate max-w-[120px]">
-                              {user.personal.nombre} {user.personal.apellido}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => openUnlinkDialog(user.user_id, user.nombre_completo)}
-                              title="Desvincular"
-                            >
-                              <Unlink className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => openLinkDialog(user.user_id, user.nombre_completo)}
-                          >
-                            <Link2 className="h-3 w-3 mr-1" />
-                            Vincular
-                          </Button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={roleBadgeVariants[user.role]}>
-                          <Shield className="w-3 h-3 mr-1" />
-                          {roleLabels[user.role]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Cambiar email"
-                            onClick={() => {
-                              setSelectedUserForEmail({ id: user.user_id, name: user.nombre_completo });
-                              setEmailDialogOpen(true);
-                            }}
-                          >
-                            <Mail className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Cambiar contraseña"
-                            onClick={() => {
-                              setSelectedUserForPassword({ id: user.user_id, name: user.nombre_completo });
-                              setPasswordDialogOpen(true);
-                            }}
-                          >
-                            <KeyRound className="h-4 w-4" />
-                          </Button>
-                          <Select
-                            value={user.role}
-                            onValueChange={(value: AppRole) => handleRoleChange(user.user_id, value)}
-                            disabled={updatingUserId === user.user_id}
-                          >
-                            <SelectTrigger className="w-[150px] bg-muted border-border">
-                              {updatingUserId === user.user_id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <SelectValue />
-                              )}
-                            </SelectTrigger>
-                            <SelectContent className="bg-popover border-border">
-                              <SelectItem value="admin">Administrador</SelectItem>
-                              <SelectItem value="capataz">Capataz</SelectItem>
-                              <SelectItem value="maquinista">Maquinista</SelectItem>
-                              <SelectItem value="ayudante">Ayudante</SelectItem>
-                              <SelectItem value="remitero">Remitero</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+  return <>
+    <Card className="card-industrial lg:col-span-2">
+      <CardHeader className="flex flex-row items-start justify-between gap-4"><div><CardTitle className="text-lg flex items-center gap-2"><Users className="w-5 h-5 text-primary" />Gestión de Usuarios</CardTitle><CardDescription>Administra membresías, roles e invitaciones con el backend seguro</CardDescription></div>{canInvite && <Button onClick={() => setInviteOpen(true)}><MailPlus className="h-4 w-4 mr-2" />Invitar usuario</Button>}</CardHeader>
+      <CardContent>
+        <div className="relative mb-4 max-w-sm"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Buscar por nombre, email, personal o rol..." value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" /></div>
+        <div className="rounded-md border border-border overflow-x-auto">
+          {loading ? <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div> : <Table><TableHeader><TableRow><TableHead>Usuario</TableHead><TableHead>Personal</TableHead><TableHead>Roles</TableHead><TableHead>Membresía</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader><TableBody>
+            {filteredUsers.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No hay usuarios registrados</TableCell></TableRow> : filteredUsers.map((managedUser) => {
+              const protectedUser = managedUser.user_id === currentUser?.id || managedUser.role_keys.includes("admin");
+              const available = roles.filter((candidate) => !managedUser.role_keys.includes(candidate.role_key));
+              const selected = available.some((candidate) => candidate.role_key === roleSelections[managedUser.membership_id]) ? roleSelections[managedUser.membership_id] : available[0]?.role_key;
+              return <TableRow key={managedUser.membership_id}><TableCell><div className="font-medium">{managedUser.display_name ?? "Sin nombre"}</div><div className="text-xs text-muted-foreground">{managedUser.email}</div></TableCell><TableCell>{managedUser.personal_name ?? "Sin vincular"}</TableCell><TableCell><div className="flex flex-wrap gap-1">{managedUser.role_keys.map((key) => <Badge key={key} variant={key === "admin" ? "default" : "secondary"}><Shield className="h-3 w-3 mr-1" />{roleLabels[key] ?? key}{canManageRoles && !protectedUser && key !== "admin" && <button type="button" className="ml-1" aria-label={`Quitar ${key}`} onClick={() => void removeRole(managedUser, key)}>×</button>}</Badge>)}</div></TableCell><TableCell><Badge variant={managedUser.membership_status === "active" ? "secondary" : "outline"}>{managedUser.membership_status === "active" ? "Activa" : "Suspendida"}</Badge></TableCell><TableCell><div className="flex justify-end gap-2 flex-wrap">{canManageRoles && !protectedUser && available.length > 0 && <><Select value={selected} onValueChange={(value) => setRoleSelections({ ...roleSelections, [managedUser.membership_id]: value })}><SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger><SelectContent>{available.map((candidate) => <SelectItem key={candidate.role_key} value={candidate.role_key}>{candidate.role_name}</SelectItem>)}</SelectContent></Select><Button variant="outline" size="sm" onClick={() => void assignRole(managedUser)}>Asignar</Button></>}{canManageRoles && !protectedUser && <Button variant="ghost" size="sm" onClick={() => void changeMembershipStatus(managedUser)}>{managedUser.membership_status === "active" ? "Suspender" : "Reactivar"}</Button>}{protectedUser && <span className="text-xs text-muted-foreground self-center">Protegido</span>}</div></TableCell></TableRow>;
+            })}
+          </TableBody></Table>}
+        </div>
+      </CardContent>
+    </Card>
 
-      {/* Link User Dialog */}
-      {selectedUserForLink && (
-        <LinkUserDialog
-          open={linkDialogOpen}
-          onOpenChange={setLinkDialogOpen}
-          userId={selectedUserForLink.id}
-          userName={selectedUserForLink.name}
-          availablePersonal={availablePersonal}
-          onSuccess={fetchData}
-        />
-      )}
+    {canInvite && <Card className="card-industrial lg:col-span-2 mt-6"><CardHeader><CardTitle className="text-lg flex items-center gap-2"><UserCheck className="w-5 h-5 text-primary" />Invitaciones activas</CardTitle></CardHeader><CardContent>{invitations.length === 0 ? <p className="text-sm text-muted-foreground">No hay invitaciones activas.</p> : <Table><TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Rol</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader><TableBody>{invitations.map((invitation) => <TableRow key={invitation.invitation_id}><TableCell>{invitation.email}</TableCell><TableCell>{roleLabels[invitation.role_key] ?? invitation.role_key}</TableCell><TableCell><Badge variant="outline">{invitation.state}</Badge></TableCell><TableCell className="text-right">{invitation.state === "pending" && <Button variant="ghost" size="sm" onClick={() => void revokeInvitation(invitation.invitation_id)}>Revocar</Button>}</TableCell></TableRow>)}</TableBody></Table>}</CardContent></Card>}
 
-      {/* Unlink Confirmation Dialog */}
-      <DeleteConfirmDialog
-        open={unlinkDialogOpen}
-        onOpenChange={setUnlinkDialogOpen}
-        onConfirm={handleUnlink}
-        title="¿Desvincular usuario?"
-        description={`Se eliminará la vinculación de "${selectedUserForUnlink?.name}" con su registro de empleado. El usuario seguirá existiendo pero no tendrá un legajo asociado.`}
-      />
-
-      {/* Change Email Dialog */}
-      {selectedUserForEmail && (
-        <ChangeEmailDialog
-          open={emailDialogOpen}
-          onOpenChange={setEmailDialogOpen}
-          userId={selectedUserForEmail.id}
-          userName={selectedUserForEmail.name}
-          onSuccess={fetchData}
-        />
-      )}
-
-      {/* Change Password Dialog */}
-      {selectedUserForPassword && (
-        <ChangePasswordDialog
-          open={passwordDialogOpen}
-          onOpenChange={setPasswordDialogOpen}
-          userId={selectedUserForPassword.id}
-          userName={selectedUserForPassword.name}
-        />
-      )}
-    </>
-  );
+    <Dialog open={inviteOpen} onOpenChange={setInviteOpen}><DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Invitar usuario</DialogTitle><DialogDescription>El acceso se crea únicamente mediante una invitación v2 segura.</DialogDescription></DialogHeader><form id="invite-user-form" onSubmit={createInvitation} className="space-y-4"><div className="space-y-2"><Label htmlFor="invite-email">Email</Label><Input id="invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></div><div className="space-y-2"><Label>Rol</Label><Select value={roleKey} onValueChange={setRoleKey}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((candidate) => <SelectItem key={candidate.role_key} value={candidate.role_key}>{candidate.role_name}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Personal (opcional)</Label><Select value={personalId || "none"} onValueChange={(value) => { const normalized = value === "none" ? "" : value; setPersonalId(normalized); const selected = people.find((person) => person.id === normalized); if (selected?.work_email) setEmail(selected.work_email); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin vincular</SelectItem>{people.map((person) => <SelectItem key={person.id} value={person.id} disabled={!person.work_email}>{person.internal_code} · {person.last_name}, {person.first_name}{person.work_email ? "" : " · sin email"}</SelectItem>)}</SelectContent></Select></div>{inviteUrl && <div className="space-y-2"><Label>Enlace de invitación</Label><div className="flex gap-2"><Input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /><Button type="button" variant="outline" size="icon" onClick={() => { void navigator.clipboard.writeText(inviteUrl); toast.success("Enlace copiado"); }}><Copy className="h-4 w-4" /></Button></div></div>}</form><DialogFooter><Button variant="outline" onClick={() => setInviteOpen(false)}>Cerrar</Button><Button form="invite-user-form" type="submit" disabled={submitting || !roleKey}>{submitting ? "Creando..." : "Crear invitación"}</Button></DialogFooter></DialogContent></Dialog>
+  </>;
 }

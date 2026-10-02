@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { 
   LayoutDashboard, 
   Building2, 
@@ -23,8 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { TopNavbar } from "@/components/layout/TopNavbar";
-
-import { LoadingScreen } from "@/components/shared/LoadingScreen";
+import { canAccessModule } from "@/config/moduleAccess";
 
 type AppRole = 'admin' | 'capataz' | 'maquinista' | 'ayudante' | 'remitero' | 'contador';
 
@@ -194,40 +192,9 @@ const apps: AppItem[] = [
   },
 ];
 
-const SERGIO_ID = 'c92028bd-dd42-416d-8892-f00b5ef90f8f';
-
 const Index = () => {
-  const { hasRole, loading: loadingAuth, roles, user } = useAuth();
-  const navigate = useNavigate();
-
-  const isSergio = user?.id === SERGIO_ID;
-
-  // Redirigir solo cuando el usuario tiene UN solo rol no-admin.
-  // Excepción: Sergio (capataz + remitero) va directo a /parte-diario.
-  useEffect(() => {
-    if (loadingAuth) return;
-    if (isSergio) {
-      navigate('/parte-diario', { replace: true });
-      return;
-    }
-    if (roles.length !== 1) return;
-    const only = roles[0];
-    if (only === 'admin') return;
-    if (only === 'remitero') {
-      navigate('/remitos', { replace: true });
-    } else {
-      navigate('/parte-diario', { replace: true });
-    }
-  }, [roles, loadingAuth, navigate, isSergio]);
-
-  if (loadingAuth || isSergio || (roles.length === 1 && roles[0] !== 'admin')) {
-    return <LoadingScreen />;
-  }
-
-  const filteredApps = apps.filter(app => {
-    if (!app.roles) return true;
-    return app.roles.some(r => hasRole(r));
-  });
+  const { roles, permissions } = useAuth();
+  const filteredApps = apps.filter((app) => canAccessModule(app.path, { roles, permissions }));
 
   return (
     <div className="min-h-screen bg-background">

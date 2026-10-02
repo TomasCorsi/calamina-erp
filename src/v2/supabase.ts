@@ -1,15 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
-import { runtimeEnv } from "@/config/runtimeEnv";
-
-export const v2Supabase = createClient(
-  runtimeEnv.supabaseUrl,
-  runtimeEnv.supabasePublishableKey,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false,
-      storageKey: "calamina-erp-v2-auth",
-    },
-  },
-);
+// Transitional alias. Keeping one client avoids competing Auth listeners and
+// separate browser sessions while v2 data logic is moved into the legacy UI.
+export { supabaseV2 as v2Supabase } from "@/integrations/supabase/client";

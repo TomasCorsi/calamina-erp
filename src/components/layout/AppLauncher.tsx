@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { canAccessModule } from "@/config/moduleAccess";
 
 type AppRole = 'admin' | 'capataz' | 'maquinista' | 'ayudante' | 'remitero' | 'contador';
 
@@ -108,24 +109,14 @@ export function AppLauncher({ className }: AppLauncherProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
-  const { hasRole, user } = useAuth();
+  const { roles, permissions } = useAuth();
   const isMobile = useIsMobile();
-
-  // Excepciones por UUID para mostrar tiles puntuales (mismo patrón que ProtectedRoute)
-  const PATH_EXCEPTIONS: Record<string, string[]> = {
-    '/remitos': ['c92028bd-dd42-416d-8892-f00b5ef90f8f'], // Sergio
-  };
 
   // Filter apps based on user role
   const filteredCategories = appCategories
     .map((category) => ({
       ...category,
-      apps: category.apps.filter((app) => {
-        const exceptions = PATH_EXCEPTIONS[app.path] ?? [];
-        if (user && exceptions.includes(user.id)) return true;
-        if (!app.roles) return true;
-        return app.roles.some((role) => hasRole(role));
-      }),
+      apps: category.apps.filter((app) => canAccessModule(app.path, { roles, permissions })),
     }))
     .filter((category) => category.apps.length > 0);
 

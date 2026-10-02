@@ -103,9 +103,9 @@ export default function Login() {
               Iniciar Sesión
             </Button>
             <p className="text-sm text-muted-foreground text-center">
-              ¿Eres empleado de campo?{' '}
-              <Link to="/registro-empleado" className="text-primary hover:underline font-medium">
-                Registrarse con Legajo
+              ¿Recibiste una invitación?{' '}
+              <Link to="/aceptar-invitacion" className="text-primary hover:underline font-medium">
+                Activar cuenta
               </Link>
             </p>
           </CardFooter>
