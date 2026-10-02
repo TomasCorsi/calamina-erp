@@ -1,9 +1,5 @@
 import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
+import V2App from './v2/V2App.tsx'
 import './index.css'
-import { registerAppServiceWorker } from './lib/registerSW'
 
-createRoot(document.getElementById("root")!).render(<App />);
-
-// Register service worker (with strict guards for preview/dev)
-registerAppServiceWorker();
+createRoot(document.getElementById("root")!).render(<V2App />);
