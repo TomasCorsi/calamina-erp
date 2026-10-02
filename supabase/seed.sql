@@ -1,0 +1,3 @@
+-- Reserved exclusively for synthetic CALAMINA ERP v2 local-development data.
+-- Never add production data, copied legacy data, credentials, tokens, or secrets.
+-- Supabase will execute this file after future ERP v2 migrations.

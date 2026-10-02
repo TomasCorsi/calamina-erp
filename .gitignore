@@ -21,6 +21,8 @@ dist-ssr
 supabase/.env
 supabase/.env.*
 !supabase/.env.example
+supabase/.temp/
+supabase/.branches/
 *.pem
 *.key
 
