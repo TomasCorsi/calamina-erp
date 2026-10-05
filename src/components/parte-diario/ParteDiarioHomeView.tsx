@@ -4,8 +4,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, isToday as isDateToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { useNavigate } from "react-router-dom";
-import { useMisDocumentos } from "@/hooks/useMisDocumentos";
 import type { ParteDiario } from "@/hooks/useParteDiario";
 import type { CargaRepartidor } from "@/hooks/useCargasRepartidor";
 import { CargasCombustibleRepartidorList } from "./CargasCombustibleRepartidorList";
@@ -21,6 +19,7 @@ interface ParteDiarioHomeViewProps {
   rolLabel: string;
   isRepartidor?: boolean;
   isMecanico?: boolean;
+  extensionsDisabled?: boolean;
   alertasPendientesCount?: number;
   entregasHoyCount?: number;
   cargasHoy?: CargaRepartidor[];
@@ -65,6 +64,7 @@ export const ParteDiarioHomeView = ({
   rolLabel,
   isRepartidor = false,
   isMecanico = false,
+  extensionsDisabled = false,
   alertasPendientesCount = 0,
   entregasHoyCount = 0,
   cargasHoy = [],
@@ -100,8 +100,6 @@ export const ParteDiarioHomeView = ({
   showRemitosButton = false,
   onIrRemitos,
 }: ParteDiarioHomeViewProps) => {
-  const navigate = useNavigate();
-  const { pendientesCount: docsPendientes } = useMisDocumentos();
   return (
     <div className="space-y-6">
       {/* Welcome */}
@@ -112,24 +110,6 @@ export const ParteDiarioHomeView = ({
         </p>
       </div>
 
-      {docsPendientes > 0 && (
-        <Alert className="bg-amber-500/10 border-amber-500/50">
-          <FileText className="h-5 w-5 text-amber-500" />
-          <AlertDescription className="ml-2">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <p className="font-semibold text-foreground">
-                  Tenés {docsPendientes} documento{docsPendientes !== 1 ? 's' : ''} para revisar
-                </p>
-                <p className="text-xs text-muted-foreground">Estudios médicos o recibos de sueldo pendientes</p>
-              </div>
-              <Button size="sm" onClick={() => navigate('/mis-documentos')}>
-                Ver
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Main buttons */}
       <div className={`grid ${isRepartidor ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
@@ -156,7 +136,7 @@ export const ParteDiarioHomeView = ({
             variant="secondary"
             className="h-24 flex-col gap-2 px-2"
             size="lg"
-            disabled={!isTodayProp}
+            disabled={!isTodayProp || extensionsDisabled}
           >
             <Fuel className="w-8 h-8" />
             <span className="font-semibold text-xs leading-tight text-center">Entrega</span>
@@ -166,18 +146,13 @@ export const ParteDiarioHomeView = ({
 
       {/* Mis Documentos - acceso siempre visible */}
       <Button
-        onClick={() => navigate('/mis-documentos')}
+        disabled
         variant="outline"
         className="w-full h-16 gap-3 relative"
         size="lg"
       >
         <FileText className="w-6 h-6" />
-        <span className="font-semibold">Mis Documentos</span>
-        {docsPendientes > 0 && (
-          <Badge className="ml-2 h-5 min-w-[20px] px-1 flex items-center justify-center text-[10px] bg-destructive text-destructive-foreground">
-            {docsPendientes}
-          </Badge>
-        )}
+        <span className="font-semibold">Mis Documentos (pendiente de migración)</span>
       </Button>
 
       {/* Remitos shortcut (Sergio) */}
@@ -194,6 +169,15 @@ export const ParteDiarioHomeView = ({
 
       {/* Mechanic buttons */}
 
+      {extensionsDisabled && (isRepartidor || isMecanico) && (
+        <Alert className="bg-amber-500/10 border-amber-500/50">
+          <AlertCircle className="h-5 w-5 text-amber-500" />
+          <AlertDescription className="ml-2">
+            Combustible, mantenimiento y alertas conservan su lugar, pero permanecen deshabilitados hasta completar su migración v2.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {isMecanico && (
         <div className="grid grid-cols-2 gap-3">
           <Button
@@ -201,6 +185,7 @@ export const ParteDiarioHomeView = ({
             variant="outline"
             className="h-24 flex-col gap-2 px-2 relative border-orange-500/40 hover:bg-orange-500/5"
             size="lg"
+            disabled={extensionsDisabled}
           >
             <div className="relative">
               <Bell className="w-8 h-8 text-orange-500" />
@@ -217,6 +202,7 @@ export const ParteDiarioHomeView = ({
             variant="outline"
             className="h-24 flex-col gap-2 px-2 border-primary/40 hover:bg-primary/5"
             size="lg"
+            disabled={extensionsDisabled}
           >
             <Wrench className="w-8 h-8 text-primary" />
             <span className="font-semibold text-xs leading-tight text-center text-foreground">Nuevo Mantenim.</span>
@@ -336,7 +322,7 @@ export const ParteDiarioHomeView = ({
         <div className="space-y-2">
           {/* Date navigator */}
           <div className="flex items-center justify-between">
-            <Button variant="ghost" size="icon" onClick={onPrevDay} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={onPrevDay} className="h-8 w-8" disabled={extensionsDisabled}>
               <ChevronLeft className="w-5 h-5" />
             </Button>
             <div className="text-center">
@@ -345,7 +331,7 @@ export const ParteDiarioHomeView = ({
                 {format(selectedDate, "EEE d MMM yyyy", { locale: es })}
               </span>
             </div>
-            <Button variant="ghost" size="icon" onClick={onNextDay} className="h-8 w-8" disabled={isTodayProp}>
+            <Button variant="ghost" size="icon" onClick={onNextDay} className="h-8 w-8" disabled={isTodayProp || extensionsDisabled}>
               <ChevronRight className="w-5 h-5" />
             </Button>
           </div>
@@ -375,7 +361,7 @@ export const ParteDiarioHomeView = ({
       {isMecanico && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" size="icon" onClick={onPrevDayMec} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={onPrevDayMec} className="h-8 w-8" disabled={extensionsDisabled}>
               <ChevronLeft className="w-5 h-5" />
             </Button>
             <div className="text-center">
@@ -384,7 +370,7 @@ export const ParteDiarioHomeView = ({
                 {format(selectedDateMecanico, "EEE d MMM yyyy", { locale: es })}
               </span>
             </div>
-            <Button variant="ghost" size="icon" onClick={onNextDayMec} className="h-8 w-8" disabled={isTodayMecanico}>
+            <Button variant="ghost" size="icon" onClick={onNextDayMec} className="h-8 w-8" disabled={isTodayMecanico || extensionsDisabled}>
               <ChevronRight className="w-5 h-5" />
             </Button>
           </div>

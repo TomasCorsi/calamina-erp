@@ -2,12 +2,12 @@ begin;
 set local search_path = public, extensions;
 select no_plan();
 
-select is((select count(*) from iam.roles), 4::bigint, 'four initial roles should exist');
-select is((select count(*) from iam.permissions), 7::bigint, 'seven permissions should exist after enabling Obras');
+select is((select count(*) from iam.roles), 5::bigint, 'five initial roles should exist');
+select is((select count(*) from iam.permissions), 9::bigint, 'nine permissions should exist after enabling Parte Diario');
 
 select is(
   (select count(*) from iam.role_permissions where role_id = '10000000-0000-4000-8000-000000000001'),
-  7::bigint,
+  9::bigint,
   'admin should receive every current permission'
 );
 select is(
@@ -24,6 +24,17 @@ select is(
   (select count(*) from iam.role_permissions where role_id = '10000000-0000-4000-8000-000000000004'),
   3::bigint,
   'viewer should receive the three view permissions'
+);
+
+select is(
+  (select count(*) from iam.role_permissions where role_id = '10000000-0000-4000-8000-000000000005'),
+  3::bigint,
+  'parte diario operator should receive obras view and both parte diario permissions'
+);
+
+select ok(
+  (select is_assignable from iam.roles where key = 'parte_diario_operator'),
+  'parte diario operator should be assignable'
 );
 
 select is(

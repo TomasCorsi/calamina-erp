@@ -1,290 +1,114 @@
-import { useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { useEmpleadoProfile } from './useEmpleadoProfile';
-import { useOfflineQueue } from './useOfflineQueue';
-import { useNetworkStatus } from './useNetworkStatus';
-import { format } from 'date-fns';
+import { useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useEmpleadoProfile } from "@/hooks/useEmpleadoProfile";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
+import { mapParteDiario, normalizeParteWrite, PARTE_DIARIO_SELECT } from "@/hooks/parteDiarioAdapter";
 
 export interface ParteDiario {
-  id: string;
-  fecha: string;
-  personal_id: string;
-  obra_id: string | null;
-  maquinaria_id: string | null;
-  hora_entrada: string | null;
-  hora_salida: string | null;
-  horometro_inicio: number;
-  horometro_fin: number;
-  cantidad_viajes: number;
-  km_camion: number;
-  cantidad_movimiento_interno: number;
-  combustible: number;
-  estado_maquina: 'OK' | 'OBSERVACION' | null;
-  observacion_maquina: string | null;
-  check_filtro_aire: boolean;
-  check_aceite_hidraulico: boolean;
-  check_aceite_motor: boolean;
-  check_liquido_refrigerante: boolean;
-  check_uria: boolean;
-  estado: 'borrador' | 'completado';
-  // New role-specific fields
-  novedades: string | null;
-  ausencias: string[] | null;
-  tareas: string | null;
-  observaciones_inconvenientes: string | null;
-  created_at: string;
-  updated_at: string;
-  // Joined relations
-  personal?: {
-    id: string;
-    nombre: string | null;
-    apellido: string | null;
-    rol: string;
-  };
-  obras?: {
-    id: string;
-    nombre: string;
-  } | null;
-  maquinarias?: {
-    id: string;
-    codigo: string | null;
-    tipo: string;
-    patente: string | null;
-  } | null;
+  id: string; company_id: string; fecha: string; personal_id: string; obra_id: string | null; maquinaria_id: string | null;
+  hora_entrada: string | null; hora_salida: string | null; horometro_inicio: number; horometro_fin: number;
+  cantidad_viajes: number; km_camion: number; cantidad_movimiento_interno: number; combustible: number;
+  estado_maquina: "OK" | "OBSERVACION" | null; observacion_maquina: string | null;
+  check_filtro_aire: boolean; check_aceite_hidraulico: boolean; check_aceite_motor: boolean;
+  check_liquido_refrigerante: boolean; check_uria: boolean; estado: "borrador" | "completado";
+  novedades: string | null; ausencias: string[] | null; tareas: string | null; observaciones_inconvenientes: string | null;
+  created_at: string; updated_at: string;
+  personal?: { id: string; nombre: string | null; apellido: string | null; rol: string };
+  obras?: { id: string; nombre: string } | null;
+  maquinarias?: { id: string; codigo: string | null; tipo: string; patente: string | null } | null;
 }
 
 export interface ParteDiarioInsert {
-  fecha: string;
-  personal_id: string;
-  obra_id?: string | null;
-  maquinaria_id?: string | null;
-  hora_entrada?: string | null;
-  hora_salida?: string | null;
-  horometro_inicio?: number;
-  horometro_fin?: number;
-  cantidad_viajes?: number;
-  km_camion?: number;
-  cantidad_movimiento_interno?: number;
-  combustible?: number;
-  estado_maquina?: 'OK' | 'OBSERVACION' | null;
-  observacion_maquina?: string | null;
-  check_filtro_aire?: boolean;
-  check_aceite_hidraulico?: boolean;
-  check_aceite_motor?: boolean;
-  check_liquido_refrigerante?: boolean;
-  check_uria?: boolean;
-  estado?: 'borrador' | 'completado';
-  // New role-specific fields
-  novedades?: string | null;
-  ausencias?: string[] | null;
-  tareas?: string | null;
-  observaciones_inconvenientes?: string | null;
+  fecha: string; personal_id: string; obra_id?: string | null; maquinaria_id?: string | null;
+  hora_entrada?: string | null; hora_salida?: string | null; horometro_inicio?: number; horometro_fin?: number;
+  cantidad_viajes?: number; km_camion?: number; cantidad_movimiento_interno?: number; combustible?: number;
+  estado_maquina?: "OK" | "OBSERVACION" | null; observacion_maquina?: string | null;
+  check_filtro_aire?: boolean; check_aceite_hidraulico?: boolean; check_aceite_motor?: boolean;
+  check_liquido_refrigerante?: boolean; check_uria?: boolean; estado?: "borrador" | "completado";
+  novedades?: string | null; ausencias?: string[] | null; tareas?: string | null; observaciones_inconvenientes?: string | null;
 }
 
 export function useParteDiario() {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
   const { empleado } = useEmpleadoProfile();
   const { isOnline } = useNetworkStatus();
-  const { enqueueOfflineParte } = useOfflineQueue();
-  const fechaHoy = format(new Date(), 'yyyy-MM-dd');
-  const fechaDesde = format(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+  const fechaHoy = format(new Date(), "yyyy-MM-dd");
+  const fechaDesde = format(new Date(Date.now() - 90 * 86400000), "yyyy-MM-dd");
 
-  // Fetch partes for the current employee (last 90 days)
-  const { data: partes = [], isLoading, error } = useQuery({
-    queryKey: ['partes_diarios', empleado?.id],
-    enabled: !!empleado?.id,
-    retry: false,
-    networkMode: 'offlineFirst',
-    staleTime: 60 * 1000,
+  const query = useQuery({
+    queryKey: ["partes-diarios-v2", membership?.company_id, empleado?.id],
+    enabled: Boolean(membership?.company_id && empleado?.id), retry: false,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('partes_diarios')
-        .select(`
-          *,
-          personal:personal_id (id, nombre, apellido, rol),
-          obras:obra_id (id, nombre),
-          maquinarias:maquinaria_id (id, codigo, tipo, patente)
-        `)
-        .eq('personal_id', empleado!.id)
-        .gte('fecha', fechaDesde)
-        .order('fecha', { ascending: false })
-        .order('created_at', { ascending: false });
-
+      const { data, error } = await supabase.from("partes_diarios").select(PARTE_DIARIO_SELECT)
+        .eq("company_id", membership!.company_id).eq("personal_id", empleado!.id)
+        .gte("fecha", fechaDesde).order("fecha", { ascending: false }).order("created_at", { ascending: false });
       if (error) throw error;
-      return data as unknown as ParteDiario[];
+      return (data ?? []).map((row) => mapParteDiario(row as Record<string, unknown>));
     },
   });
+  const partes = query.data ?? [];
+  const partesHoy = useMemo(() => partes.filter((p) => p.fecha === fechaHoy), [fechaHoy, partes]);
+  const borradorHoy = partesHoy.find((p) => p.estado === "borrador") ?? null;
+  const partesCompletadosHoy = partesHoy.filter((p) => p.estado === "completado");
 
-  // Derive today's partes from the already-fetched list (no extra network call)
-  const partesHoy = useMemo(
-    () => partes.filter(p => p.fecha === fechaHoy),
-    [partes, fechaHoy]
-  );
-  const isLoadingParteHoy = isLoading;
+  const ensureOnline = () => {
+    if (!isOnline) {
+      toast.error("Se necesita conexión para guardar. El borrador del formulario permanece en este dispositivo.");
+      throw new Error("offline persistence disabled");
+    }
+    if (!membership || !empleado) throw new Error("membership or personal profile unavailable");
+  };
+  const invalidate = async () => { await queryClient.invalidateQueries({ queryKey: ["partes-diarios-v2"] }); };
 
-  // Derived: first draft found today (for "continue draft" flow)
-  const borradorHoy = partesHoy.find(p => p.estado === 'borrador') || null;
-  
-  // Derived: all completed partes today
-  const partesCompletadosHoy = partesHoy.filter(p => p.estado === 'completado');
-  
-  // Legacy compat: single parteHoy (first one)
-  const parteHoy = partesHoy.length > 0 ? partesHoy[0] : null;
-  
-  // Legacy compat
-  const parteCompletadoHoy = partesCompletadosHoy.length > 0 ? partesCompletadosHoy[0] : null;
-
-  // Create new parte
   const createMutation = useMutation({
-    mutationFn: async (parte: ParteDiarioInsert) => {
-      const { data, error } = await supabase
-        .from('partes_diarios')
-        .insert(parte)
-        .select()
-        .single();
-
+    mutationFn: async (input: ParteDiarioInsert) => {
+      ensureOnline();
+      const payload = { ...normalizeParteWrite(input), company_id: membership!.company_id, personal_id: empleado!.id };
+      const { data, error } = await supabase.from("partes_diarios").insert(payload).select(PARTE_DIARIO_SELECT).single();
       if (error) throw error;
-      return data;
+      return mapParteDiario(data as Record<string, unknown>);
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['partes_diarios'] });
-      queryClient.invalidateQueries({ queryKey: ['parte_hoy'] });
-      const isComplete = variables.estado === 'completado';
-      toast.success(isComplete ? 'Parte completado exitosamente' : 'Borrador guardado');
-    },
-    onError: (error: Error) => {
-      console.error('Error creating parte:', error);
-      toast.error('Error al guardar el parte diario');
-    },
+    onSuccess: async (_, input) => { await invalidate(); toast.success(input.estado === "completado" ? "Parte completado exitosamente" : "Borrador guardado"); },
+    onError: (error: Error) => { if (error.message !== "offline persistence disabled") toast.error("Error al guardar el parte diario"); },
   });
-
-  // Update existing parte
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<ParteDiario> & { id: string }) => {
-      const { data, error } = await supabase
-        .from('partes_diarios')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
+    mutationFn: async ({ id, ...input }: Partial<ParteDiarioInsert> & { id: string }) => {
+      ensureOnline();
+      const { data, error } = await supabase.from("partes_diarios").update(normalizeParteWrite(input))
+        .eq("id", id).eq("company_id", membership!.company_id).eq("personal_id", empleado!.id)
+        .select(PARTE_DIARIO_SELECT).single();
       if (error) throw error;
-      return data;
+      return mapParteDiario(data as Record<string, unknown>);
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['partes_diarios'] });
-      queryClient.invalidateQueries({ queryKey: ['parte_hoy'] });
-      const isComplete = variables.estado === 'completado';
-      toast.success(isComplete ? 'Parte completado exitosamente' : 'Borrador actualizado');
-    },
-    onError: (error: Error) => {
-      console.error('Error updating parte:', error);
-      toast.error('Error al actualizar el parte diario');
-    },
+    onSuccess: async (_, input) => { await invalidate(); toast.success(input.estado === "completado" ? "Parte completado exitosamente" : "Borrador actualizado"); },
+    onError: (error: Error) => { if (error.message !== "offline persistence disabled") toast.error("Error al actualizar el parte diario"); },
   });
-
-  // Delete parte
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('partes_diarios')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['partes_diarios'] });
-      queryClient.invalidateQueries({ queryKey: ['parte_hoy'] });
-      toast.success('Parte eliminado');
-    },
-    onError: (error: Error) => {
-      console.error('Error deleting parte:', error);
-      toast.error('Error al eliminar el parte diario');
-    },
+    mutationFn: async (id: string) => { ensureOnline(); const { error } = await supabase.from("partes_diarios").delete().eq("id", id).eq("company_id", membership!.company_id).eq("personal_id", empleado!.id); if (error) throw error; },
+    onSuccess: async () => { await invalidate(); toast.success("Parte eliminado"); },
+    onError: (error: Error) => { if (error.message !== "offline persistence disabled") toast.error("Error al eliminar el parte diario"); },
   });
-
-  // Find existing parte for a specific machine today
-  const findParteForMachine = (maquinariaId: string | null) => {
-    if (!maquinariaId) {
-      // For roles without machine, find any parte today
-      return partesHoy[0] || null;
-    }
-    return partesHoy.find(p => p.maquinaria_id === maquinariaId) || null;
-  };
-
-  // Save as draft - finds matching parte by machine to prevent duplicates
-  const saveDraft = async (data: ParteDiarioInsert, editingParteId?: string) => {
-    const parteData = { ...data, estado: 'borrador' as const };
-    
-    // Offline: queue locally
-    if (!isOnline) {
-      enqueueOfflineParte(parteData);
-      return;
-    }
-
-    if (editingParteId) {
-      await updateMutation.mutateAsync({ id: editingParteId, ...parteData });
-    } else {
-      const existing = findParteForMachine(data.maquinaria_id || null);
-      if (existing) {
-        await updateMutation.mutateAsync({ id: existing.id, ...parteData });
-      } else {
-        await createMutation.mutateAsync(parteData);
-      }
-    }
-  };
-
-  // Complete parte - finds matching parte by machine to prevent duplicates
-  const completeParte = async (data: ParteDiarioInsert, editingParteId?: string) => {
-    const parteData = { ...data, estado: 'completado' as const };
-    
-    // Offline: queue locally
-    if (!isOnline) {
-      enqueueOfflineParte(parteData);
-      return;
-    }
-
-    if (editingParteId) {
-      await updateMutation.mutateAsync({ id: editingParteId, ...parteData });
-    } else {
-      const existing = findParteForMachine(data.maquinaria_id || null);
-      if (existing) {
-        await updateMutation.mutateAsync({ id: existing.id, ...parteData });
-      } else {
-        await createMutation.mutateAsync(parteData);
-      }
-    }
-  };
-
-  // Discard draft
-  const discardDraft = async () => {
-    if (borradorHoy) {
-      await deleteMutation.mutateAsync(borradorHoy.id);
-    }
+  const persist = async (input: ParteDiarioInsert, estado: "borrador" | "completado", editingId?: string) => {
+    const data = { ...input, estado };
+    const existing = partesHoy.find((p) => p.maquinaria_id === (input.maquinaria_id || null));
+    if (editingId || existing) await updateMutation.mutateAsync({ id: editingId ?? existing!.id, ...data });
+    else await createMutation.mutateAsync(data);
   };
 
   return {
-    partes,
-    parteHoy,
-    partesHoy,
-    borradorHoy,
-    parteCompletadoHoy,
-    partesCompletadosHoy,
-    isLoading,
-    isLoadingParteHoy,
-    error,
-    createParte: createMutation.mutateAsync,
-    updateParte: updateMutation.mutateAsync,
-    deleteParte: deleteMutation.mutateAsync,
-    saveDraft,
-    completeParte,
-    discardDraft,
-    isCreating: createMutation.isPending,
-    isUpdating: updateMutation.isPending,
-    isDeleting: deleteMutation.isPending,
+    partes, partesHoy, borradorHoy, partesCompletadosHoy,
+    parteHoy: partesHoy[0] ?? null, parteCompletadoHoy: partesCompletadosHoy[0] ?? null,
+    isLoading: query.isLoading, isLoadingParteHoy: query.isLoading, error: query.error,
+    createParte: createMutation.mutateAsync, updateParte: updateMutation.mutateAsync, deleteParte: deleteMutation.mutateAsync,
+    saveDraft: (data: ParteDiarioInsert, id?: string) => persist(data, "borrador", id),
+    completeParte: (data: ParteDiarioInsert, id?: string) => persist(data, "completado", id),
+    discardDraft: () => borradorHoy ? deleteMutation.mutateAsync(borradorHoy.id) : Promise.resolve(),
+    isCreating: createMutation.isPending, isUpdating: updateMutation.isPending, isDeleting: deleteMutation.isPending,
     isSaving: createMutation.isPending || updateMutation.isPending,
   };
 }

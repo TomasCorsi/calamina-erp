@@ -18,7 +18,8 @@ import {
   Table as TableIcon,
   Download,
   UserX,
-  Building2
+  Building2,
+  ShieldCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,21 +52,18 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useParteDiarioAdmin, type ParteDiarioAdminFilters } from "@/hooks/useParteDiarioAdmin";
-import { usePersonal } from "@/hooks/usePersonal";
-import { useObras } from "@/hooks/useObras";
-import { useEmpleadosSinParte } from "@/hooks/useEmpleadosSinParte";
 import { ParteDiarioDetailDialog } from "./ParteDiarioDetailDialog";
-import { ParteDiarioRendimientoTab } from "./ParteDiarioRendimientoTab";
 import { ParteDiarioKPIs } from "./ParteDiarioKPIs";
 import { ParteDiarioQuickFilters } from "./ParteDiarioQuickFilters";
 import { ParteDiarioCardView } from "./ParteDiarioCardView";
-import { EmpleadosSinParteTab } from "./EmpleadosSinParteTab";
-import { ParteDiarioRendimientoObras } from "./ParteDiarioRendimientoObras";
 import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 import { ParteDiarioEditDialog } from "./ParteDiarioEditDialog";
 import type { ParteDiario } from "@/hooks/useParteDiario";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
+import { mapParteDiario, PARTE_DIARIO_SELECT } from "@/hooks/parteDiarioAdapter";
+import { useParteDiarioCatalogs } from "@/hooks/useParteDiarioCatalogs";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -131,13 +129,7 @@ export const ParteDiarioAdminView = ({ onBack }: ParteDiarioAdminViewProps) => {
   }, [setUrlFilters]);
   
   const { partes, isLoading, updateParte, isUpdating, deleteParte, isDeleting } = useParteDiarioAdmin(filters);
-  const { personal = [] } = usePersonal();
-  const { obras = [] } = useObras();
-  
-  // Only fetch "sin parte hoy" when the relevant tabs are active
-  const today = format(new Date(), "yyyy-MM-dd");
-  const sinParteEnabled = activeTab === "listado" || activeTab === "faltantes";
-  const { empleadosSinParte } = useEmpleadosSinParte(today, sinParteEnabled);
+  const { personal, obras, maquinarias } = useParteDiarioCatalogs();
 
 
   // Filter partes by search term (employee name)
@@ -259,11 +251,11 @@ export const ParteDiarioAdminView = ({ onBack }: ParteDiarioAdminViewProps) => {
       for (let from = 0; ; from += step) {
         const { data, error } = await supabase
           .from("partes_diarios")
-          .select(`*, personal:personal_id (id, nombre, apellido, rol), obras:obra_id (id, nombre), maquinarias:maquinaria_id (id, codigo, tipo, patente)`)
+          .select(PARTE_DIARIO_SELECT)
           .order("fecha", { ascending: false })
           .range(from, from + step - 1);
         if (error) throw error;
-        const batch = (data ?? []) as unknown as ParteDiario[];
+        const batch = (data ?? []).map((row) => mapParteDiario(row as Record<string, unknown>));
         all.push(...batch);
         if (batch.length < step) break;
       }
@@ -335,7 +327,7 @@ export const ParteDiarioAdminView = ({ onBack }: ParteDiarioAdminViewProps) => {
               completados={kpis.completados}
               borradores={kpis.borradores}
               empleadosUnicos={kpis.empleadosUnicos}
-              sinParteHoy={empleadosSinParte.length}
+              sinParteHoy={0}
             />
 
             <Card>
@@ -606,17 +598,17 @@ export const ParteDiarioAdminView = ({ onBack }: ParteDiarioAdminViewProps) => {
 
           {/* Rendimiento Tab */}
           <TabsContent value="rendimiento" className="mt-4">
-            <ParteDiarioRendimientoTab personal={personal} />
+            <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Rendimiento pendiente de migración</AlertTitle><AlertDescription>Esta sección conserva su ubicación visual, pero no ejecuta consultas legacy.</AlertDescription></Alert>
           </TabsContent>
 
           {/* Por Obra Tab */}
           <TabsContent value="por_obra" className="mt-4">
-            <ParteDiarioRendimientoObras />
+            <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Rendimiento por obra pendiente de migración</AlertTitle><AlertDescription>La vista será habilitada cuando sus agregaciones v2 estén verificadas.</AlertDescription></Alert>
           </TabsContent>
 
           {/* Faltantes Tab */}
           <TabsContent value="faltantes" className="mt-4">
-            <EmpleadosSinParteTab />
+            <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Faltantes pendiente de migración</AlertTitle><AlertDescription>La sección está aislada y no consulta el backend legacy.</AlertDescription></Alert>
           </TabsContent>
         </Tabs>
       </div>
@@ -638,6 +630,8 @@ export const ParteDiarioAdminView = ({ onBack }: ParteDiarioAdminViewProps) => {
           setParteToEdit(null);
         }}
         isSaving={isUpdating}
+        obras={obras}
+        maquinarias={maquinarias}
       />
 
       <DeleteConfirmDialog

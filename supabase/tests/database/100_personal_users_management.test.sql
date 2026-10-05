@@ -51,10 +51,11 @@ select throws_like(
   '%not authorized%',
   'a user without personal.view should not list personal'
 );
-select is(
+select cmp_ok(
   (select count(*) from api.list_users()),
+  '>=',
   4::bigint,
-  'a user_manager should list company users'
+  'a user_manager should list company users, including an optional bootstrapped local admin'
 );
 reset role;
 

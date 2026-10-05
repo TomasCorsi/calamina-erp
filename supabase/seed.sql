@@ -47,6 +47,7 @@ insert into public.personal (
   last_name,
   work_email,
   job_title,
+  work_role,
   status
 )
 values
@@ -58,6 +59,7 @@ values
     'Demostracion',
     'ana.demo@example.invalid',
     'Administracion demo',
+    'capataz',
     'active'
   ),
   (
@@ -68,6 +70,7 @@ values
     'Ejemplo',
     'bruno.demo@example.invalid',
     'Operaciones demo',
+    'maquinista',
     'active'
   ),
   (
@@ -78,6 +81,7 @@ values
     'Ficticia',
     null,
     null,
+    'chofer',
     'inactive'
   )
 on conflict (id) do update
@@ -86,6 +90,7 @@ set internal_code = excluded.internal_code,
     last_name = excluded.last_name,
     work_email = excluded.work_email,
     job_title = excluded.job_title,
+    work_role = excluded.work_role,
     status = excluded.status;
 
 insert into public.clientes (
@@ -181,3 +186,104 @@ set nombre = excluded.nombre,
     fecha_fin_estimada = excluded.fecha_fin_estimada,
     responsable_id = excluded.responsable_id,
     cliente_id = excluded.cliente_id;
+
+insert into public.maquinarias (
+  id,
+  company_id,
+  codigo,
+  nombre,
+  tipo,
+  patente,
+  estado
+)
+values
+  (
+    '00000000-0000-4000-8004-000000000001',
+    '00000000-0000-4000-8000-000000000001',
+    'EXC-DEMO-01',
+    'Excavadora Demo',
+    'retroexcavadora',
+    null,
+    'operativa'
+  ),
+  (
+    '00000000-0000-4000-8004-000000000002',
+    '00000000-0000-4000-8000-000000000001',
+    'CAM-DEMO-01',
+    'Camion Demo',
+    'camion',
+    'AA000AA',
+    'operativa'
+  )
+on conflict (id) do update
+set codigo = excluded.codigo,
+    nombre = excluded.nombre,
+    tipo = excluded.tipo,
+    patente = excluded.patente,
+    estado = excluded.estado;
+
+insert into public.partes_diarios (
+  id,
+  company_id,
+  personal_id,
+  obra_id,
+  maquinaria_id,
+  fecha,
+  hora_entrada,
+  hora_salida,
+  horometro_inicio,
+  horometro_fin,
+  combustible,
+  estado_maquina,
+  estado,
+  tareas,
+  observaciones_inconvenientes
+)
+values
+  (
+    '00000000-0000-4000-8005-000000000001',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8001-000000000002',
+    '00000000-0000-4000-8003-000000000001',
+    '00000000-0000-4000-8004-000000000001',
+    '2026-10-05',
+    '08:00',
+    '17:00',
+    1200,
+    1208,
+    42,
+    'OK',
+    'completado',
+    'Movimiento de suelo de demostracion.',
+    null
+  ),
+  (
+    '00000000-0000-4000-8005-000000000002',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8001-000000000001',
+    '00000000-0000-4000-8003-000000000001',
+    null,
+    '2026-10-05',
+    '07:45',
+    null,
+    0,
+    0,
+    0,
+    null,
+    'borrador',
+    null,
+    'Parte ficticio para validar el flujo local.'
+  )
+on conflict (id) do update
+set obra_id = excluded.obra_id,
+    maquinaria_id = excluded.maquinaria_id,
+    fecha = excluded.fecha,
+    hora_entrada = excluded.hora_entrada,
+    hora_salida = excluded.hora_salida,
+    horometro_inicio = excluded.horometro_inicio,
+    horometro_fin = excluded.horometro_fin,
+    combustible = excluded.combustible,
+    estado_maquina = excluded.estado_maquina,
+    estado = excluded.estado,
+    tareas = excluded.tareas,
+    observaciones_inconvenientes = excluded.observaciones_inconvenientes;

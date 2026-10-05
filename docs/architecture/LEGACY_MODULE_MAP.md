@@ -32,7 +32,7 @@ esquema anterior ni se presenta un shell alternativo.
 | Gastos / Combustible | `/gastos` | `Gastos`, componentes `gastos/*` | `cargas_combustible_repartidor`, `otros_gastos`, obras y personal selector | Pendiente; separar carga operativa y aprobación/costo, con RPCs y auditoría. |
 | Mantenimiento | `/mantenimiento` | `MantenimientoPage`, formularios de service/reparación | `mantenimientos`, `mantenimientos_list_view`, `observaciones_maquina_estado`, `personal_selector` | Pendiente; reemplazar vistas y writes directos, definir responsables y estados. |
 | Stock | `/stock` | `Stock` | `stock_items`, `movimientos_stock` | Pendiente; movimientos deben ser RPC transaccional y el stock derivado no editable directamente. |
-| Parte Diario | `/parte-diario` | `ParteDiario`, vistas admin/formulario y cola offline | `partes_diarios`, `personal_selector`, `obras`, `maquinarias`; cola offline del navegador | Segundo módulo planificado; requiere baseline, ownership, validación de fecha/empleado y estrategia offline segura. |
+| Parte Diario | `/parte-diario` | `ParteDiario`, home, formulario, listado, detalle y vista administrativa legacy | `partes_diarios`, `obras`, maestro mínimo `maquinarias`, `api.list_parte_diario_personal_options`; borrador de formulario local | Núcleo compatible con v2. Rendimiento, faltantes, combustible, mantenimiento y alertas permanecen aislados sin consultas legacy. La cola offline anterior no se reenvía automáticamente. |
 | Presentismo | `/presentismo` | `Presentismo` | `registros_hh`, `personal` | Pendiente; definir fuente de verdad y reglas de corrección/auditoría. |
 | Proveedores / Compras | `/proveedores` | `Proveedores`, componentes de órdenes e importación | `proveedores`, `ordenes_compra`, `orden_compra_items`, Edge `parse-orden-compra` | Pendiente; proveedores y órdenes requieren scopes, workflow mínimo y RPC cabecera/items. |
 | Liquidaciones | `/liquidaciones` | `Liquidaciones`, detalle, adelantos, préstamos y configuración | `liquidaciones`, `liquidacion_items`, `liquidacion_config_personal`, `adelantos_personal`, `prestamos_personal`, `prestamo_cuotas`, `sueldos` | Pendiente sensible; no montar hasta definir acceso salarial, auditoría y separación de funciones. |
@@ -101,7 +101,7 @@ módulo activo, sin conectar temporalmente al backend anterior.
 | Personal básico | Compatible v2 con UI legacy | Media | Ahora |
 | Configuración / Usuarios | Parcialmente compatible v2 | Media | Ahora |
 | Obras | Compatible v2 con UI legacy; avance/certificados pendientes | Media | Completado |
-| Parte Diario | Backend y cola offline pendientes | Muy alta | 2 |
+| Parte Diario | Núcleo CRUD/RLS v2 operativo; extensiones legacy aisladas | Media | Compatible parcial |
 | Remitos | Cabecera, items e importación pendientes | Alta | 3 |
 | Maquinarias / Vehículos | Maestro, actividad y costos pendientes | Alta | 4 |
 | Gastos / Combustible | Operación, aprobación y auditoría pendientes | Alta | 5 |

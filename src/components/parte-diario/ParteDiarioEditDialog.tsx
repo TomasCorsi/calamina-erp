@@ -24,9 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useObras } from "@/hooks/useObras";
-import { useMaquinarias } from "@/hooks/useMaquinarias";
 import type { ParteDiario } from "@/hooks/useParteDiario";
+import type { ParteMaquinariaOption, ParteObraOption } from "@/hooks/useParteDiarioCatalogs";
 
 interface ParteDiarioEditDialogProps {
   parte: ParteDiario | null;
@@ -34,6 +33,8 @@ interface ParteDiarioEditDialogProps {
   onOpenChange: (open: boolean) => void;
   onSave: (id: string, data: Partial<ParteDiario>) => Promise<void>;
   isSaving?: boolean;
+  obras: ParteObraOption[];
+  maquinarias: ParteMaquinariaOption[];
 }
 
 interface FormData {
@@ -77,9 +78,9 @@ export function ParteDiarioEditDialog({
   onOpenChange,
   onSave,
   isSaving = false,
+  obras,
+  maquinarias,
 }: ParteDiarioEditDialogProps) {
-  const { obras = [] } = useObras();
-  const { maquinarias = [] } = useMaquinarias();
 
   const { register, handleSubmit, reset, setValue, watch, formState: { isDirty } } = useForm<FormData>();
 

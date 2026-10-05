@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { supabaseV2 as supabase } from "@/integrations/supabase/client";
+import { WORK_ROLES, WORK_ROLE_LABELS, type WorkRole } from "@/types/workRole";
 
 type Person = {
   id: string;
@@ -23,12 +24,13 @@ type Person = {
   last_name: string;
   work_email: string | null;
   job_title: string | null;
+  work_role: WorkRole | null;
   status: "active" | "inactive";
   has_user: boolean;
 };
 
-type PersonalForm = { internal_code: string; first_name: string; last_name: string; work_email: string; job_title: string };
-const emptyForm: PersonalForm = { internal_code: "", first_name: "", last_name: "", work_email: "", job_title: "" };
+type PersonalForm = { internal_code: string; first_name: string; last_name: string; work_email: string; job_title: string; work_role: WorkRole | "" };
+const emptyForm: PersonalForm = { internal_code: "", first_name: "", last_name: "", work_email: "", job_title: "", work_role: "" };
 
 function PendingTab({ name }: { name: string }) {
   return <Alert className="max-w-3xl"><ShieldCheck className="h-4 w-4" /><AlertTitle>{name} conserva su lugar original</AlertTitle><AlertDescription>Su interfaz se habilitará nuevamente cuando el dominio tenga tablas, RLS y operaciones v2 verificadas. No se están ejecutando consultas al backend legacy.</AlertDescription></Alert>;
@@ -60,7 +62,7 @@ export default function Personal() {
     const term = search.trim().toLocaleLowerCase("es");
     return people.filter((person) => {
       const matchesStatus = statusFilter === "all" || person.status === statusFilter;
-      const haystack = [person.internal_code, person.first_name, person.last_name, person.work_email, person.job_title].filter(Boolean).join(" ").toLocaleLowerCase("es");
+      const haystack = [person.internal_code, person.first_name, person.last_name, person.work_email, person.job_title, person.work_role].filter(Boolean).join(" ").toLocaleLowerCase("es");
       return matchesStatus && (!term || haystack.includes(term));
     });
   }, [people, search, statusFilter]);
@@ -68,14 +70,14 @@ export default function Personal() {
   const openCreate = () => { setEditing(null); setForm(emptyForm); setFormOpen(true); };
   const openEdit = (person: Person) => {
     setEditing(person);
-    setForm({ internal_code: person.internal_code, first_name: person.first_name, last_name: person.last_name, work_email: person.work_email ?? "", job_title: person.job_title ?? "" });
+    setForm({ internal_code: person.internal_code, first_name: person.first_name, last_name: person.last_name, work_email: person.work_email ?? "", job_title: person.job_title ?? "", work_role: person.work_role ?? "" });
     setFormOpen(true);
   };
 
   const save = async () => {
     if (!form.internal_code.trim() || !form.first_name.trim() || !form.last_name.trim()) return toast.error("Completá código, nombre y apellido");
     setSubmitting(true);
-    const common = { p_internal_code: form.internal_code.trim(), p_first_name: form.first_name.trim(), p_last_name: form.last_name.trim(), p_work_email: form.work_email.trim() || null, p_job_title: form.job_title.trim() || null };
+    const common = { p_internal_code: form.internal_code.trim(), p_first_name: form.first_name.trim(), p_last_name: form.last_name.trim(), p_work_email: form.work_email.trim() || null, p_job_title: form.job_title.trim() || null, p_work_role: form.work_role || null };
     const result = editing
       ? await supabase.schema("api").rpc("update_personal", { p_personal_id: editing.id, ...common })
       : await supabase.schema("api").rpc("create_personal", common);
@@ -115,7 +117,7 @@ export default function Personal() {
           {loading ? <div className="p-6 space-y-3"><Skeleton className="h-8 w-full" /><Skeleton className="h-32 w-full" /></div> : <Table>
             <TableHeader><TableRow><TableHead>Personal</TableHead><TableHead>Código</TableHead><TableHead>Email</TableHead><TableHead>Puesto</TableHead><TableHead>Usuario</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
             <TableBody>{filtered.length === 0 ? <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No se encontraron empleados</TableCell></TableRow> : filtered.map((person) => <TableRow key={person.id}>
-              <TableCell className="font-medium">{person.last_name}, {person.first_name}</TableCell><TableCell className="font-mono">{person.internal_code}</TableCell><TableCell>{person.work_email ?? "-"}</TableCell><TableCell>{person.job_title ?? "-"}</TableCell><TableCell><Badge variant={person.has_user ? "default" : "outline"}>{person.has_user ? "Vinculado" : "Sin usuario"}</Badge></TableCell><TableCell><Badge variant={person.status === "active" ? "secondary" : "outline"}>{person.status === "active" ? "Activo" : "Inactivo"}</Badge></TableCell>
+              <TableCell className="font-medium">{person.last_name}, {person.first_name}</TableCell><TableCell className="font-mono">{person.internal_code}</TableCell><TableCell>{person.work_email ?? "-"}</TableCell><TableCell><div>{person.job_title ?? "-"}</div>{person.work_role && <div className="text-xs text-muted-foreground">{WORK_ROLE_LABELS[person.work_role]}</div>}</TableCell><TableCell><Badge variant={person.has_user ? "default" : "outline"}>{person.has_user ? "Vinculado" : "Sin usuario"}</Badge></TableCell><TableCell><Badge variant={person.status === "active" ? "secondary" : "outline"}>{person.status === "active" ? "Activo" : "Inactivo"}</Badge></TableCell>
               <TableCell className="text-right">{canManage && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => openEdit(person)}>Editar</DropdownMenuItem><DropdownMenuItem onClick={() => void changeStatus(person)}>{person.status === "active" ? "Inactivar" : "Reactivar"}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}</TableCell>
             </TableRow>)}</TableBody>
           </Table>}
@@ -130,9 +132,10 @@ export default function Personal() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2"><Label htmlFor="internal-code">Código interno</Label><Input id="internal-code" value={form.internal_code} onChange={(event) => setForm({ ...form, internal_code: event.target.value })} /></div>
         <div className="space-y-2"><Label htmlFor="job-title">Puesto</Label><Input id="job-title" value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} /></div>
+        <div className="space-y-2"><Label>Rol operativo</Label><Select value={form.work_role || "none"} onValueChange={(value) => setForm({ ...form, work_role: value === "none" ? "" : value as WorkRole })}><SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger><SelectContent><SelectItem value="none">Sin asignar</SelectItem>{WORK_ROLES.map((role) => <SelectItem key={role} value={role}>{WORK_ROLE_LABELS[role]}</SelectItem>)}</SelectContent></Select></div>
         <div className="space-y-2"><Label htmlFor="first-name">Nombre</Label><Input id="first-name" value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} /></div>
         <div className="space-y-2"><Label htmlFor="last-name">Apellido</Label><Input id="last-name" value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} /></div>
-        <div className="space-y-2 md:col-span-2"><Label htmlFor="work-email">Email laboral</Label><Input id="work-email" type="email" value={form.work_email} onChange={(event) => setForm({ ...form, work_email: event.target.value })} /></div>
+        <div className="space-y-2"><Label htmlFor="work-email">Email laboral</Label><Input id="work-email" type="email" value={form.work_email} onChange={(event) => setForm({ ...form, work_email: event.target.value })} /></div>
       </div>
     </FormDialog>
   </MainLayout>;
