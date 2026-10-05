@@ -11,6 +11,7 @@ export function canAccessModule(path: string, context: ModuleAccessContext): boo
   if (path === "/personal") return context.permissions.has("personal.view");
   if (path === "/parte-diario") return context.permissions.has("parte_diario.view");
   if (path === "/remitos") return context.permissions.has("remitos.view");
+  if (path === "/maquinarias") return context.permissions.has("maquinarias.view");
   if (path === "/configuracion" || path === "/usuarios") {
     return USER_MANAGEMENT_PERMISSIONS.some((permission) => context.permissions.has(permission));
   }

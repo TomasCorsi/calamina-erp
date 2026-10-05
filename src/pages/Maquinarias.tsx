@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { useUrlSearch, useUrlTab } from "@/hooks/useUrlState";
+import { useUrlSearch } from "@/hooks/useUrlState";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -48,14 +48,13 @@ import { FormDialog } from "@/components/shared/FormDialog";
 import { DetailDialog } from "@/components/shared/DetailDialog";
 import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 import { DetailRow, DetailSection } from "@/components/shared/DetailRow";
-import { GastosMaquinaria } from "@/components/maquinarias/GastosMaquinaria";
 import { MaquinariasDataGrid } from "@/components/maquinarias/MaquinariasDataGrid";
 import { useMaquinarias, MaquinariaWithRelations, MaquinariaForm, TipoMaquinaria, EstadoMaquinaria } from "@/hooks/useMaquinarias";
-import { usePersonal } from "@/hooks/usePersonal";
-import { useObras } from "@/hooks/useObras";
+import { useMaquinariasCatalogs } from "@/hooks/useMaquinariasCatalogs";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { CSVImportDialog } from "@/components/maquinarias/CSVImportDialog";
-import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ShieldCheck } from "lucide-react";
 
 const tiposConfig: Record<TipoMaquinaria, string> = {
   cargadora: "Cargadora",
@@ -93,22 +92,20 @@ const estadoConfig: Record<EstadoMaquinaria, { label: string; icon: any; classNa
 };
 
 export default function Maquinarias() {
-  const { maquinarias, loading, createMaquinaria, updateMaquinaria, deleteMaquinaria, batchSave } = useMaquinarias();
-  const { personal } = usePersonal();
-  const { obras } = useObras();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("maquinarias.manage");
+  const { maquinarias, loading, createMaquinaria, updateMaquinaria, batchSave } = useMaquinarias();
+  const { obras, operadores } = useMaquinariasCatalogs();
   
   const [searchTerm, setSearchTerm] = useUrlSearch("");
   const [estadoFilter, setEstadoFilter] = useState<string>("todos");
   const [formOpen, setFormOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [selectedMaquinaria, setSelectedMaquinaria] = useState<MaquinariaWithRelations | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "grid">("cards");
-
-  const operadores = personal.filter(p => p.rol === "maquinista" && p.activo);
 
   const [formData, setFormData] = useState<MaquinariaForm>({
     codigo: "",
@@ -119,6 +116,7 @@ export default function Maquinarias() {
     patente: "",
     estado: "operativa",
     horas_acumuladas: 0,
+    km_acumulados: 0,
   });
 
   const filteredMaquinarias = maquinarias.filter((m) => {
@@ -132,6 +130,7 @@ export default function Maquinarias() {
   });
 
   const handleNew = () => {
+    if (!canManage) return;
     setIsEditing(false);
     setFormData({
       codigo: "",
@@ -142,11 +141,13 @@ export default function Maquinarias() {
       patente: "",
       estado: "operativa",
       horas_acumuladas: 0,
+      km_acumulados: 0,
     });
     setFormOpen(true);
   };
 
   const handleEdit = (maq: MaquinariaWithRelations) => {
+    if (!canManage) return;
     setIsEditing(true);
     setSelectedMaquinaria(maq);
     setFormData({
@@ -158,6 +159,7 @@ export default function Maquinarias() {
       patente: maq.patente || "",
       estado: maq.estado,
       horas_acumuladas: maq.horas_acumuladas,
+      km_acumulados: maq.km_acumulados,
       operador_asignado_id: maq.operador_asignado_id || undefined,
       obra_id: maq.obra_id || undefined,
     });
@@ -169,20 +171,13 @@ export default function Maquinarias() {
     setDetailOpen(true);
   };
 
-  const handleDelete = (maq: MaquinariaWithRelations) => {
-    setSelectedMaquinaria(maq);
-    setDeleteOpen(true);
-  };
-
   const confirmDelete = async () => {
-    if (selectedMaquinaria) {
-      await deleteMaquinaria(selectedMaquinaria.id);
-    }
     setDeleteOpen(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     setIsSubmitting(true);
     
     if (isEditing && selectedMaquinaria) {
@@ -193,12 +188,6 @@ export default function Maquinarias() {
     
     setIsSubmitting(false);
     setFormOpen(false);
-  };
-
-  const handleCSVImport = async (maquinarias: MaquinariaForm[]) => {
-    for (const maq of maquinarias) {
-      await createMaquinaria(maq);
-    }
   };
 
   if (loading) {
@@ -258,8 +247,8 @@ export default function Maquinarias() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setCsvImportOpen(true)}
                   className="border-border"
+                  disabled
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   Importar CSV
@@ -267,6 +256,7 @@ export default function Maquinarias() {
                 <Button
                   onClick={handleNew}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground btn-industrial"
+                  disabled={!canManage}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Nueva Maquinaria
@@ -279,6 +269,7 @@ export default function Maquinarias() {
             <MaquinariasDataGrid
               maquinarias={maquinarias}
               onSave={batchSave}
+              canManage={canManage}
             />
           ) : (
             <>
@@ -365,11 +356,11 @@ export default function Maquinarias() {
                               <Eye className="w-4 h-4 mr-2" />
                               Ver detalle
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEdit(maq)} className="cursor-pointer">
+                            <DropdownMenuItem onClick={() => handleEdit(maq)} className="cursor-pointer" disabled={!canManage}>
                               <Edit className="w-4 h-4 mr-2" />
                               Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDelete(maq)} className="text-destructive cursor-pointer">
+                            <DropdownMenuItem className="text-destructive cursor-pointer" disabled>
                               <Trash2 className="w-4 h-4 mr-2" />
                               Eliminar
                             </DropdownMenuItem>
@@ -425,7 +416,13 @@ export default function Maquinarias() {
         </TabsContent>
 
         <TabsContent value="gastos">
-          <GastosMaquinaria />
+          <Alert>
+            <ShieldCheck className="h-4 w-4" />
+            <AlertTitle>Gastos y costos pendientes de migración</AlertTitle>
+            <AlertDescription>
+              Esta pestaña conserva su ubicación legacy, pero mantenimiento, combustible, costos, alertas y reportes permanecen aislados sin ejecutar consultas del backend anterior.
+            </AlertDescription>
+          </Alert>
         </TabsContent>
       </Tabs>
 
@@ -446,6 +443,7 @@ export default function Maquinarias() {
                 onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
                 placeholder="EXC-001"
                 className="bg-muted border-border"
+                required
               />
             </div>
             <div className="space-y-2">
@@ -455,6 +453,7 @@ export default function Maquinarias() {
                 value={formData.nombre}
                 onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                 className="bg-muted border-border"
+                required
               />
             </div>
             <div className="space-y-2">
@@ -556,7 +555,7 @@ export default function Maquinarias() {
               <Input
                 id="horas_acumuladas"
                 type="number"
-                value={formData.horas_acumuladas}
+                value={formData.tipo && esVehiculoKm(formData.tipo) ? formData.km_acumulados : formData.horas_acumuladas}
                 readOnly
                 disabled
                 className="bg-muted border-border opacity-60"
@@ -567,7 +566,7 @@ export default function Maquinarias() {
             <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || !canManage}>
               {isSubmitting ? "Guardando..." : isEditing ? "Guardar Cambios" : "Crear Maquinaria"}
             </Button>
           </div>
@@ -626,12 +625,6 @@ export default function Maquinarias() {
         description={`¿Estás seguro de que deseas eliminar "${selectedMaquinaria?.nombre}"? Esta acción no se puede deshacer.`}
       />
 
-      {/* CSV Import Dialog */}
-      <CSVImportDialog
-        open={csvImportOpen}
-        onOpenChange={setCsvImportOpen}
-        onImport={handleCSVImport}
-      />
     </MainLayout>
   );
 }

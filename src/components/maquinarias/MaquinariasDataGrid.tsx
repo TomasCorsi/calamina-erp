@@ -38,6 +38,7 @@ interface MaquinariasDataGridProps {
     deleted: string[];
   }) => Promise<void>;
   fullScreen?: boolean;
+  canManage?: boolean;
 }
 
 const tiposConfig: Record<TipoMaquinaria, string> = {
@@ -76,6 +77,7 @@ export function MaquinariasDataGrid({
   maquinarias,
   onSave,
   fullScreen = false,
+  canManage = true,
 }: MaquinariasDataGridProps) {
   const gridHeight = fullScreen ? window.innerHeight - 180 : 500;
   
@@ -449,8 +451,9 @@ export function MaquinariasDataGrid({
   }, [createdRowIds]);
 
   const handleAddRow = useCallback(() => {
+    if (!canManage) return;
     setData((prev) => [...prev, createRow()]);
-  }, [createRow]);
+  }, [canManage, createRow]);
 
   const handleReset = useCallback(() => {
     setData(initialData);
@@ -461,6 +464,7 @@ export function MaquinariasDataGrid({
   }, [initialData, createdRowIds, deletedRowIds, updatedRowIds]);
 
   const handleSave = useCallback(async () => {
+    if (!canManage) return;
     setIsSaving(true);
     try {
       const created = data
@@ -508,7 +512,12 @@ export function MaquinariasDataGrid({
     } finally {
       setIsSaving(false);
     }
-  }, [data, onSave, createdRowIds, deletedRowIds, updatedRowIds]);
+  }, [canManage, data, onSave, createdRowIds, deletedRowIds, updatedRowIds]);
+
+  const gridColumns = useMemo(
+    () => canManage ? columns : columns.map((column) => ({ ...column, disabled: true })),
+    [canManage, columns],
+  );
 
   return (
     <div className={`flex flex-col ${fullScreen ? 'h-full' : 'space-y-4'}`}>
@@ -550,7 +559,7 @@ export function MaquinariasDataGrid({
         
         <div className="flex-1" />
         
-        <Button onClick={handleAddRow} variant="outline" size="sm" className="h-8 border-border">
+        <Button onClick={handleAddRow} variant="outline" size="sm" className="h-8 border-border" disabled={!canManage}>
           <Plus className="w-3.5 h-3.5 mr-1" />
           Agregar
         </Button>
@@ -562,7 +571,7 @@ export function MaquinariasDataGrid({
         )}
         <Button 
           onClick={handleSave} 
-          disabled={!hasChanges || isSaving} 
+          disabled={!canManage || !hasChanges || isSaving}
           size="sm"
           className="h-8 bg-primary hover:bg-primary/90"
         >
@@ -579,6 +588,7 @@ export function MaquinariasDataGrid({
         <DataSheetGrid
           value={filteredData}
           onChange={(newData, ops) => {
+            if (!canManage) return;
             // Map changes back to full data array
             const fullData = [...data];
             
@@ -596,8 +606,9 @@ export function MaquinariasDataGrid({
             
             handleChange(fullData, ops);
           }}
-          columns={columns}
+          columns={gridColumns}
           createRow={createRow}
+          lockRows
           height={gridHeight}
           rowClassName={({ rowData }) => {
             const row = rowData as GridRow;

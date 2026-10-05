@@ -193,8 +193,14 @@ insert into public.maquinarias (
   codigo,
   nombre,
   tipo,
+  marca,
+  anio,
   patente,
-  estado
+  estado,
+  horas_acumuladas,
+  km_acumulados,
+  operador_asignado_id,
+  obra_id
 )
 values
   (
@@ -203,8 +209,14 @@ values
     'EXC-DEMO-01',
     'Excavadora Demo',
     'retroexcavadora',
+    'Caterpillar',
+    2020,
     null,
-    'operativa'
+    'operativa',
+    1250,
+    0,
+    '00000000-0000-4000-8001-000000000002',
+    '00000000-0000-4000-8003-000000000001'
   ),
   (
     '00000000-0000-4000-8004-000000000002',
@@ -212,15 +224,27 @@ values
     'CAM-DEMO-01',
     'Camion Demo',
     'camion',
+    'Iveco',
+    2022,
     'AA000AA',
-    'operativa'
+    'operativa',
+    0,
+    45500,
+    '00000000-0000-4000-8001-000000000002',
+    '00000000-0000-4000-8003-000000000002'
   )
 on conflict (id) do update
 set codigo = excluded.codigo,
     nombre = excluded.nombre,
     tipo = excluded.tipo,
+    marca = excluded.marca,
+    anio = excluded.anio,
     patente = excluded.patente,
-    estado = excluded.estado;
+    estado = excluded.estado,
+    horas_acumuladas = excluded.horas_acumuladas,
+    km_acumulados = excluded.km_acumulados,
+    operador_asignado_id = excluded.operador_asignado_id,
+    obra_id = excluded.obra_id;
 
 insert into public.partes_diarios (
   id,
