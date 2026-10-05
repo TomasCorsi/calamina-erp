@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 
 export interface RemitoItemInput {
   concepto: string;
@@ -45,7 +45,7 @@ export const resumenItems = (items: RemitoItemInput[] | undefined | null): strin
 const PAGE_SIZE = 1000;
 
 export async function fetchRemitoItems(remitoId: string): Promise<RemitoItem[]> {
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from("remito_items")
     .select("*")
     .eq("remito_id", remitoId)
@@ -71,7 +71,7 @@ async function fetchAllItems(): Promise<Record<string, RemitoItem[]>> {
   const map: Record<string, RemitoItem[]> = {};
   let from = 0;
   while (true) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("remito_items")
       .select("*")
       .order("remito_id", { ascending: true })
@@ -107,27 +107,16 @@ export function useRemitoItemsMap() {
 
 /** Reemplaza el set completo de ítems de un remito */
 export async function saveRemitoItems(remitoId: string, items: RemitoItemInput[]) {
-  const { error: delError } = await (supabase as any)
-    .from("remito_items")
-    .delete()
-    .eq("remito_id", remitoId);
-  if (delError) throw delError;
-
   const limpios = (items || []).filter(
     (i) => (i.concepto || "").trim() !== "" || (Number(i.cantidad) || 0) !== 0
   );
-  if (limpios.length === 0) return;
-
-  const { error } = await (supabase as any).from("remito_items").insert(
-    limpios.map((i, idx) => ({
-      remito_id: remitoId,
-      orden: idx,
-      concepto: (i.concepto || "").trim(),
-      cantidad: Number(i.cantidad) || 0,
-      unidad: i.unidad || "DIA",
-      precio_unitario: Number(i.precio_unitario) || 0,
-      precio_total: Number(i.precio_total) || 0,
-    }))
-  );
+  const { error } = await supabase.schema("api").rpc("replace_remito_items", {
+    p_remito_id: remitoId,
+    p_items: limpios.map((item) => ({
+      concepto: (item.concepto || "").trim(), cantidad: Number(item.cantidad) || 0,
+      unidad: item.unidad || "DIA", precio_unitario: Number(item.precio_unitario) || 0,
+      precio_total: Number(item.precio_total) || 0,
+    })),
+  });
   if (error) throw error;
 }

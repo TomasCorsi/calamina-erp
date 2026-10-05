@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 
 export interface RemitosFilterOptions {
   tipos: string[];
@@ -36,8 +36,8 @@ const fetchOptions = async (filterByUserId: string | null): Promise<RemitosFilte
   let from = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    let query = (supabase as any)
-      .from("remitos_list_view")
+    let query = supabase
+      .from("remitos")
       .select("tipo_material, proveedor, tipo_transporte, desde, hasta, created_by")
       .range(from, from + PAGE_SIZE - 1);
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 
 /**
  * Returns a map of user_id -> nombre_completo for all distinct created_by ids in remitos.
@@ -20,7 +20,7 @@ export function useRemitosCreators(userIds: string[], enabled: boolean) {
     (async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("user_id, nombre_completo")
+        .select("user_id, display_name")
         .in("user_id", userIds);
       if (cancelled) return;
       if (error || !data) {
@@ -29,7 +29,7 @@ export function useRemitosCreators(userIds: string[], enabled: boolean) {
       }
       const m: Record<string, string> = {};
       data.forEach((p: any) => {
-        if (p.user_id) m[p.user_id] = p.nombre_completo || "";
+        if (p.user_id) m[p.user_id] = p.display_name || "";
       });
       setMap(m);
     })();

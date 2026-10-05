@@ -23,6 +23,7 @@ const Obras = lazy(() => import("./pages/Obras"));
 const Personal = lazy(() => import("./pages/Personal"));
 const Configuracion = lazy(() => import("./pages/Configuracion"));
 const ParteDiario = lazy(() => import("./pages/ParteDiario"));
+const Remitos = lazy(() => import("./pages/Remitos"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,7 +45,6 @@ const pendingModules = [
   ["/cotizaciones", "Cotizaciones", "Presupuestos y propuestas comerciales"],
   ["/certificados", "Certificados de Obra", "Gestión de certificaciones mensuales por obra"],
   ["/viajes", "Viajes", "Registro de viajes y transporte"],
-  ["/remitos", "Remitos", "Gestión de remitos y entregas"],
   ["/proveedores", "Proveedores", "Proveedores y órdenes de compra"],
   ["/maquinarias", "Maquinarias", "Control de equipos y flota"],
   ["/presentismo", "Presentismo (HH)", "Control de asistencia y horas trabajadas"],
@@ -84,6 +84,7 @@ export default function App() {
                   <Route path="/obras" element={<ProtectedRoute requiredPermissions={["obras.view"]}><Obras /></ProtectedRoute>} />
                   <Route path="/personal" element={<ProtectedRoute requiredPermissions={["personal.view"]}><Personal /></ProtectedRoute>} />
                   <Route path="/parte-diario" element={<ProtectedRoute requiredPermissions={["parte_diario.view"]}><ParteDiario /></ProtectedRoute>} />
+                  <Route path="/remitos" element={<ProtectedRoute requiredPermissions={["remitos.view"]}><Remitos /></ProtectedRoute>} />
                   <Route path="/configuracion" element={<ProtectedRoute requiredPermissions={["users.view", "users.invite", "users.manage_roles"]}><Configuracion /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<Navigate to="/configuracion" replace />} />
                   {pendingModules.map(([path, title, subtitle]) => (

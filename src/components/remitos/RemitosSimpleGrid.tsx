@@ -18,6 +18,7 @@ interface RemitosSimpleGridProps {
   showClienteCantera?: boolean;
   hideExtrasForFranco?: boolean;
   itemsMap?: Record<string, RemitoItem[]>;
+  canManage?: boolean;
 }
 
 interface RowProps {
@@ -31,6 +32,7 @@ interface RowProps {
   onDelete: (id: string) => void;
   style: React.CSSProperties;
   columns: { key: string; width: number; align?: "right" | "center" }[];
+  canManage: boolean;
 }
 
 const ROW_HEIGHT = 34;
@@ -52,6 +54,7 @@ const Row = memo(function Row({
   onDelete,
   style,
   columns,
+  canManage,
 }: RowProps) {
   const cellBase = "px-3 py-2 border-b border-border text-xs truncate";
   const valByKey: Record<string, React.ReactNode> = {
@@ -97,7 +100,7 @@ const Row = memo(function Row({
               className={`${cellBase} flex items-center justify-center gap-1`}
               style={{ width: c.width, minWidth: c.width }}
             >
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(r)}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(r)} disabled={!canManage}>
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
               <Button
@@ -105,6 +108,7 @@ const Row = memo(function Row({
                 size="icon"
                 className="h-7 w-7 text-destructive hover:text-destructive"
                 onClick={() => onDelete(r.id)}
+                disabled={!canManage}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -135,6 +139,7 @@ const Row = memo(function Row({
     prev.showClienteCantera === next.showClienteCantera &&
     prev.hideExtrasForFranco === next.hideExtrasForFranco &&
     prev.itemsMap === next.itemsMap &&
+    prev.canManage === next.canManage &&
     prev.style.transform === next.style.transform
   );
 });
@@ -148,6 +153,7 @@ export function RemitosSimpleGrid({
   showClienteCantera = false,
   hideExtrasForFranco = false,
   itemsMap,
+  canManage = true,
 }: RemitosSimpleGridProps) {
   const maqMap = useMemo(() => {
     const m: Record<string, string> = {};
@@ -267,6 +273,7 @@ export function RemitosSimpleGrid({
                     onEdit={onEdit}
                     onDelete={onDelete}
                     columns={columns}
+                    canManage={canManage}
                     style={{
                       position: "absolute",
                       top: 0,

@@ -287,3 +287,71 @@ set obra_id = excluded.obra_id,
     estado = excluded.estado,
     tareas = excluded.tareas,
     observaciones_inconvenientes = excluded.observaciones_inconvenientes;
+
+insert into public.remitos (
+  id, company_id, numero, fecha, obra_id, maquinaria_id, material, cantidad,
+  unidad, recibido_por, remito_local, desde, hasta, cantidad_viajes,
+  tipo_material, tipo_transporte, cantidad_uni, precio_unitario, precio_total,
+  precio_calc_mode, cliente, observaciones
+)
+values
+  (
+    '00000000-0000-4000-8006-000000000001',
+    '00000000-0000-4000-8000-000000000001',
+    'REM-DEMO-001', '2026-10-05',
+    '00000000-0000-4000-8003-000000000001',
+    '00000000-0000-4000-8004-000000000002',
+    'Tosca demo', 24, 'M3', '-', 'REM-DEMO-001',
+    'Obra Demo Parque Industrial', 'Obra Demo Acceso Sur', 2,
+    'Tosca demo', 'Camion propio', 12, 1000, 2000, 'viajes',
+    'Cliente Demo Norte', 'Remito completamente ficticio.'
+  ),
+  (
+    '00000000-0000-4000-8006-000000000002',
+    '00000000-0000-4000-8000-000000000001',
+    'REM-DEMO-002', '2026-10-04',
+    '00000000-0000-4000-8003-000000000002',
+    null,
+    'Arena demo', 10, 'M3', '-', 'REM-DEMO-002',
+    'Proveedor Demo', 'Obra Demo Acceso Sur', 1,
+    'Arena demo', 'Tercero', 10, 750, 7500, 'cantidad',
+    'Cliente Demo Sur', null
+  )
+on conflict (id) do update
+set numero = excluded.numero,
+    fecha = excluded.fecha,
+    obra_id = excluded.obra_id,
+    maquinaria_id = excluded.maquinaria_id,
+    material = excluded.material,
+    cantidad = excluded.cantidad,
+    unidad = excluded.unidad,
+    remito_local = excluded.remito_local,
+    desde = excluded.desde,
+    hasta = excluded.hasta,
+    cantidad_viajes = excluded.cantidad_viajes,
+    tipo_material = excluded.tipo_material,
+    tipo_transporte = excluded.tipo_transporte,
+    cantidad_uni = excluded.cantidad_uni,
+    precio_unitario = excluded.precio_unitario,
+    precio_total = excluded.precio_total,
+    precio_calc_mode = excluded.precio_calc_mode,
+    cliente = excluded.cliente,
+    observaciones = excluded.observaciones;
+
+insert into public.remito_items (
+  id, company_id, remito_id, orden, concepto, cantidad, unidad, precio_unitario, precio_total
+)
+values
+  (
+    '00000000-0000-4000-8007-000000000001',
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8006-000000000001',
+    0, 'Hora de retro demo', 2, 'HS', 500, 1000
+  )
+on conflict (id) do update
+set orden = excluded.orden,
+    concepto = excluded.concepto,
+    cantidad = excluded.cantidad,
+    unidad = excluded.unidad,
+    precio_unitario = excluded.precio_unitario,
+    precio_total = excluded.precio_total;

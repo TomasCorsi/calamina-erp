@@ -30,8 +30,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { RemitoItemsEditor } from "@/components/remitos/RemitoItemsEditor";
 import { fetchRemitoItems, RemitoItemInput, totalItems } from "@/hooks/useRemitoItems";
 
-const FRANCO_USER_ID = "2184b0ef-3c4f-4ca7-bdbf-c7cc69fc4c3a";
-
 const TIPO_MATERIAL_OPTIONS = [
   "Residuos", "Desmonte", "Cascote", "Escombro", "Tierra", "Piedra",
   "Movimiento interno", "Tosca", "Cemento", "Hormigon", "Traslado",
@@ -110,8 +108,8 @@ export function RemitoQuickFormDialog({
   onSubmit,
   editingRemito,
 }: RemitoQuickFormDialogProps) {
-  const { user, hasRole } = useAuth();
-  const isFranco = user?.id === FRANCO_USER_ID;
+  const { hasRole } = useAuth();
+  const isFranco = false;
   const isAdmin = hasRole('admin');
   const showClienteCantera = isFranco || isAdmin;
   const [saving, setSaving] = useState(false);
@@ -455,6 +453,8 @@ export function RemitoQuickFormDialog({
                 value={form.proveedor}
                 onValueChange={(v) => set("proveedor", v)}
                 placeholder="Proveedor..."
+                allowCustom
+                customLabel="Agregar proveedor"
               />
             </div>
           )}

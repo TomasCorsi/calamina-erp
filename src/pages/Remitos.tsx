@@ -50,14 +50,13 @@ import { useRemitosCreators } from "@/hooks/useRemitosCreators";
 import { useRemitosFilterOptions } from "@/hooks/useRemitosFilterOptions";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useObras } from "@/hooks/useObras";
-import { useMaquinarias } from "@/hooks/useMaquinarias";
-import { useClientes } from "@/hooks/useClientes";
-import { useProveedores } from "@/hooks/useProveedores";
+import { useRemitosCatalogs } from "@/hooks/useRemitosCatalogs";
+import type { ProveedorDB } from "@/hooks/useProveedores";
 import { RemitosSimpleGrid } from "@/components/remitos/RemitosSimpleGrid";
 import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 import { toast } from "sonner";
-import { CombustibleRepartidorPanel } from "@/components/gastos/CombustibleRepartidorPanel";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ShieldCheck } from "lucide-react";
 
 // Lazy-load heavy dialogs to keep initial Remitos render snappy
 const RemitosCSVImportDialog = lazy(() =>
@@ -82,24 +81,13 @@ const AsignarPreciosMasivosDialog = lazy(() =>
 // Re-export type for local usage
 type RemitoEditData = import("@/components/remitos/RemitoQuickFormDialog").RemitoEditData;
 
-const SERGIO_USER_ID = "c92028bd-dd42-416d-8892-f00b5ef90f8f";
-const FRANCO_USER_ID = "2184b0ef-3c4f-4ca7-bdbf-c7cc69fc4c3a";
-const CALAMINASUR_USER_ID = "73236f17-0602-41aa-8959-ee14be48f477";
-
 export default function Remitos() {
-  const { user, role } = useAuth();
-  const isSergio = user?.id === SERGIO_USER_ID;
-  const isFranco = user?.id === FRANCO_USER_ID;
-  const isCalaminasur = user?.id === CALAMINASUR_USER_ID;
-  const isOwnOnly = isSergio || isFranco || isCalaminasur;
-  const isAdminOrCapataz = role === "admin" || role === "capataz";
-  const [seccion, setSeccion] = useState<"remitos" | "combustible">("remitos");
+  const { user, hasPermission } = useAuth();
+  const canManage = hasPermission("remitos.manage");
+  const canViewCreators = hasPermission("users.view");
   const { remitos, loading, batchSave, createRemito, fetchRemitos, loadAll, cargarHistorico, cargandoHistorico } = useRemitos();
   const { itemsMap, invalidateItems } = useRemitoItemsMap();
-  const { obras } = useObras();
-  const { maquinarias } = useMaquinarias();
-  const { clientes } = useClientes();
-  const { proveedores } = useProveedores();
+  const { obras, maquinarias, clientes } = useRemitosCatalogs();
 
   const [searchTerm, setSearchTerm] = useUrlSearch("");
   // Debounced version used by the heavy filter computation
@@ -120,6 +108,10 @@ export default function Remitos() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingRemito, setEditingRemito] = useState<RemitoEditData | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [recalculando, setRecalculando] = useState(false);
+  const [liquidacionOpen, setLiquidacionOpen] = useState(false);
+  const [liquidacionObraOpen, setLiquidacionObraOpen] = useState(false);
+  const [preciosOpen, setPreciosOpen] = useState(false);
   const [tipoFilter, setTipoFilter] = useState<string[]>([]);
   const [creadorFilter, setCreadorFilter] = useState<string[]>([]);
   const [proveedorFilter, setProveedorFilter] = useState<string[]>([]);
@@ -127,10 +119,6 @@ export default function Remitos() {
   const [desdeFilter, setDesdeFilter] = useState<string[]>([]);
   const [hastaFilter, setHastaFilter] = useState<string[]>([]);
 
-  const [liquidacionOpen, setLiquidacionOpen] = useState(false);
-  const [liquidacionObraOpen, setLiquidacionObraOpen] = useState(false);
-  const [recalculando, setRecalculando] = useState(false);
-  const [preciosOpen, setPreciosOpen] = useState(false);
 
   const hayFiltrosDeValor =
     tipoFilter.length > 0 ||
@@ -159,10 +147,10 @@ export default function Remitos() {
   }, [filters.fechaDesde, filters.mes, hayFiltrosDeValor, loadAll, cargarHistorico]);
 
   // Opciones de filtros traídas de la base completa (no solo de lo cargado en pantalla)
-  const { options: filterOptions } = useRemitosFilterOptions(isOwnOnly ? user?.id ?? null : null, !!user);
+  const { options: filterOptions } = useRemitosFilterOptions(null, !!user);
 
   const creadorIds = filterOptions.creadores;
-  const creadoresMap = useRemitosCreators(creadorIds, isAdminOrCapataz);
+  const creadoresMap = useRemitosCreators(creadorIds, canViewCreators);
 
   const tiposUnicos = filterOptions.tipos;
   const proveedoresUnicos = filterOptions.proveedores;
@@ -170,60 +158,34 @@ export default function Remitos() {
   const desdeUnicos = filterOptions.desde;
   const hastaUnicos = filterOptions.hasta;
 
+  const proveedores = useMemo<ProveedorDB[]>(() => proveedoresUnicos.map((nombre) => ({
+    id: nombre, nombre, cuit: null, direccion: null, localidad: null, telefono: null,
+    email: null, contacto: null, rubro: null, observaciones: null, activo: true,
+    created_at: "", updated_at: "",
+  })), [proveedoresUnicos]);
+
+  // Conservados únicamente para los diálogos de importación, que permanecen
+  // deshabilitados hasta contar con un flujo v2 específico y validado.
+  const maquinariasMap = useMemo(() => Object.fromEntries(
+    maquinarias.filter((item) => item.codigo).map((item) => [item.codigo, item.id]),
+  ), [maquinarias]);
+  const patentesMap = useMemo(() => Object.fromEntries(
+    maquinarias.filter((item) => item.patente).flatMap((item) => {
+      const patente = item.patente!.toUpperCase();
+      return [[patente, item.id], [patente.replace(/[-\s]/g, ""), item.id]];
+    }),
+  ), [maquinarias]);
+  const obrasMap = useMemo(() => Object.fromEntries(
+    obras.flatMap((obra) => [[obra.nombre.toLowerCase().trim(), obra.nombre], ...(obra.numero ? [[obra.numero.toLowerCase().trim(), obra.nombre]] : [])]),
+  ), [obras]);
+  const obrasClienteMap = useMemo(() => Object.fromEntries(
+    obras.filter((obra) => obra.cliente?.nombre).map((obra) => [obra.nombre, obra.cliente!.nombre]),
+  ), [obras]);
+  const clientesMap = useMemo(() => Object.fromEntries(
+    clientes.filter((cliente) => cliente.activo).map((cliente) => [cliente.nombre.toLowerCase().trim(), cliente.nombre]),
+  ), [clientes]);
 
 
-  // Maps for import dialog
-  const maquinariasMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    maquinarias.forEach(m => {
-      if (m.codigo) map[m.codigo] = m.id;
-    });
-    return map;
-  }, [maquinarias]);
-
-  const patentesMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    maquinarias.forEach(m => {
-      if (m.patente) {
-        const normalized = m.patente.toUpperCase().replace(/[-\s]/g, '');
-        map[m.patente.toUpperCase()] = m.id;
-        map[normalized] = m.id;
-      }
-    });
-    return map;
-  }, [maquinarias]);
-
-  const obrasMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    obras.forEach(o => {
-      map[o.nombre.toLowerCase().trim()] = o.nombre;
-      if (o.numero) {
-        map[o.numero.toLowerCase().trim()] = o.nombre;
-      }
-    });
-    return map;
-  }, [obras]);
-
-  const obrasClienteMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    obras.forEach(o => {
-      if (o.cliente?.nombre) map[o.nombre] = o.cliente.nombre;
-    });
-    return map;
-  }, [obras]);
-
-  const clientesMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    clientes.filter(c => c.activo).forEach(c => {
-      map[c.nombre.toLowerCase().trim()] = c.nombre;
-    });
-    obras.forEach(o => {
-      if (o.numero && o.cliente?.nombre) {
-        map[o.numero.toLowerCase().trim()] = o.cliente.nombre;
-      }
-    });
-    return map;
-  }, [clientes, obras]);
 
   // Maquinarias lookup for search
   const maquinariasById = useMemo(() => {
@@ -344,6 +306,7 @@ export default function Remitos() {
   };
 
   const handleEdit = (r: RemitoWithRelations) => {
+    if (!canManage) return;
     setEditingRemito({
       id: r.id,
       fecha: r.fecha,
@@ -373,7 +336,7 @@ export default function Remitos() {
   };
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteId || !canManage) return;
     try {
       await batchSave({ created: [], updated: [], deleted: [deleteId] });
       toast.success("Remito eliminado");
@@ -386,7 +349,11 @@ export default function Remitos() {
   const handleFormSubmit = async (
     remito: RemitoForm & { id?: string; items?: RemitoItemInput[] }
   ) => {
+    if (!canManage) throw new Error("Sin permiso para administrar remitos");
     const { id, items, ...data } = remito;
+    const linkedObra = obras.find((obra) => obra.nombre === data.hasta)
+      ?? obras.find((obra) => obra.nombre === data.desde);
+    data.obra_id = linkedObra?.id;
     if (id) {
       const results = await batchSave({ created: [], updated: [{ id, data }], deleted: [] });
       if (results.errors > 0) throw new Error("Error al actualizar");
@@ -398,6 +365,7 @@ export default function Remitos() {
       if (!created) throw new Error("Error al crear");
       await saveRemitoItems((created as any).id, items);
       invalidateItems();
+      toast.success("Remito creado exitosamente");
     } else {
       const results = await batchSave({ created: [data as RemitoForm], updated: [], deleted: [] });
       if (results.errors > 0) throw new Error("Error al crear");
@@ -492,7 +460,7 @@ export default function Remitos() {
       "Forma de Pago": r.forma_pago || "",
       "Proveedor": r.proveedor || "",
       "Observaciones": r.observaciones || "",
-      ...(isAdminOrCapataz ? { "Cargado por": (r as any).created_by ? (creadoresMap[(r as any).created_by] || "") : "" } : {}),
+      ...(canViewCreators ? { "Cargado por": (r as any).created_by ? (creadoresMap[(r as any).created_by] || "") : "" } : {}),
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -558,38 +526,8 @@ export default function Remitos() {
     );
   }
 
-  const SeccionTabs = () =>
-    isFranco ? (
-      <div className="mb-4 inline-flex rounded-lg border border-border bg-card p-1">
-        {(["remitos", "combustible"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSeccion(s)}
-            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              seccion === s
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {s === "remitos" ? "Remitos" : "Combustible"}
-          </button>
-        ))}
-      </div>
-    ) : null;
-
-  if (isFranco && seccion === "combustible") {
-    return (
-      <MainLayout title="Remitos" subtitle="Gestión de remitos y entregas">
-        <SeccionTabs />
-        <CombustibleRepartidorPanel />
-      </MainLayout>
-    );
-  }
-
   return (
     <MainLayout title="Remitos" subtitle="Gestión de remitos y entregas">
-      <SeccionTabs />
       {/* Filter Bar */}
       <div className="mb-4">
         <FilterBar
@@ -653,7 +591,7 @@ export default function Remitos() {
           selected={hastaFilter}
           onChange={setHastaFilter}
         />
-        {isAdminOrCapataz && (
+        {canViewCreators && (
           <MultiSelectFilter
             className="w-[220px]"
             allLabel="Todos los usuarios"
@@ -737,6 +675,11 @@ export default function Remitos() {
 
 
       {/* Actions Bar */}
+      <Alert className="mb-4">
+        <ShieldCheck className="h-4 w-4" />
+        <AlertTitle>Funciones avanzadas pendientes de migración</AlertTitle>
+        <AlertDescription>Importaciones masivas, asignación masiva de precios, liquidaciones y combustible permanecen visibles pero deshabilitados. El CRUD e ítems de Remitos operan exclusivamente sobre v2.</AlertDescription>
+      </Alert>
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -750,6 +693,7 @@ export default function Remitos() {
         <Button
           onClick={() => { setEditingRemito(null); setFormOpen(true); }}
           className="gap-2"
+          disabled={!canManage}
         >
           <Plus className="w-4 h-4" />
           Nuevo
@@ -773,12 +717,12 @@ export default function Remitos() {
             Cargar histórico
           </Button>
         )}
-        {!isOwnOnly && (
-          <>
+        <>
             <Button
               variant="outline"
               onClick={() => setImportOpen(true)}
               className="gap-2"
+              disabled
             >
               <Upload className="w-4 h-4" />
               Importar
@@ -787,6 +731,7 @@ export default function Remitos() {
               variant="outline"
               onClick={() => setImportGauchoOpen(true)}
               className="gap-2"
+              disabled
             >
               <Upload className="w-4 h-4" />
               Importar remitos Canteras del Gaucho
@@ -795,6 +740,7 @@ export default function Remitos() {
               variant="outline"
               onClick={() => setPreciosOpen(true)}
               className="gap-2"
+              disabled
             >
               <DollarSign className="w-4 h-4" />
               Asignar Precios
@@ -802,30 +748,27 @@ export default function Remitos() {
             <Button
               variant="outline"
               onClick={handleRecalcularClientes}
-              disabled={recalculando}
+              disabled
               className="gap-2"
             >
               {recalculando ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               Recalcular Clientes
             </Button>
-          </>
-        )}
+        </>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" disabled>
               <FileText className="w-4 h-4" />
               Liquidar
               <ChevronDown className="w-4 h-4 opacity-60" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {!isOwnOnly && (
-              <DropdownMenuItem onClick={() => setLiquidacionOpen(true)}>
-                <FileText className="w-4 h-4 mr-2" />
-                Por Cliente
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => setLiquidacionObraOpen(true)}>
+            <DropdownMenuItem onClick={() => setLiquidacionOpen(true)} disabled>
+              <FileText className="w-4 h-4 mr-2" />
+              Por Cliente
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLiquidacionObraOpen(true)} disabled>
               <FileText className="w-4 h-4 mr-2" />
               Por Obra
             </DropdownMenuItem>
@@ -896,9 +839,10 @@ export default function Remitos() {
           obras={obras}
           onEdit={handleEdit}
           onDelete={(id) => setDeleteId(id)}
-          creadoresMap={isAdminOrCapataz ? creadoresMap : undefined}
-          showClienteCantera={isFranco || isAdminOrCapataz}
-          hideExtrasForFranco={isFranco}
+          creadoresMap={canViewCreators ? creadoresMap : undefined}
+          showClienteCantera={canViewCreators}
+          hideExtrasForFranco={false}
+          canManage={canManage}
           itemsMap={itemsMap}
         />
       </div>
