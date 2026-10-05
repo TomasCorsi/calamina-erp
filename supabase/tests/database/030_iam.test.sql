@@ -3,12 +3,12 @@ set local search_path = public, extensions;
 select no_plan();
 
 select is((select count(*) from iam.roles), 4::bigint, 'four initial roles should exist');
-select is((select count(*) from iam.permissions), 5::bigint, 'five initial permissions should exist');
+select is((select count(*) from iam.permissions), 7::bigint, 'seven permissions should exist after enabling Obras');
 
 select is(
   (select count(*) from iam.role_permissions where role_id = '10000000-0000-4000-8000-000000000001'),
-  5::bigint,
-  'admin should receive every initial permission'
+  7::bigint,
+  'admin should receive every current permission'
 );
 select is(
   (select count(*) from iam.role_permissions where role_id = '10000000-0000-4000-8000-000000000002'),
@@ -22,8 +22,8 @@ select is(
 );
 select is(
   (select count(*) from iam.role_permissions where role_id = '10000000-0000-4000-8000-000000000004'),
-  2::bigint,
-  'viewer should receive the two view permissions'
+  3::bigint,
+  'viewer should receive the three view permissions'
 );
 
 select is(

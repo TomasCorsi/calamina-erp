@@ -191,7 +191,7 @@ select set_config('request.jwt.claim.sub', '39000000-0000-4000-8000-000000000003
 set local role authenticated;
 select results_eq(
   $$select permission_key from api.current_user_permissions() order by permission_key$$,
-  $$values ('personal.view'::text), ('users.view'::text)$$,
+  $$values ('obras.view'::text), ('personal.view'::text), ('users.view'::text)$$,
   'the accepted viewer should receive only the viewer permission union'
 );
 select throws_like(

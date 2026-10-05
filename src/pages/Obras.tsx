@@ -41,13 +41,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormDialog } from "@/components/shared/FormDialog";
 import { DetailDialog } from "@/components/shared/DetailDialog";
-import { AvanceObraTab } from "@/components/obras/AvanceObraTab";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 import { DetailRow, DetailSection } from "@/components/shared/DetailRow";
 import { useObras, ObraWithRelations, ObraForm, EstadoObra } from "@/hooks/useObras";
-import { usePersonal } from "@/hooks/usePersonal";
-import { useClientes } from "@/hooks/useClientes";
+import { useAuth } from "@/hooks/useAuth";
 import { cn, formatDate } from "@/lib/utils";
 
 const estadoConfig: Record<EstadoObra, { label: string; className: string }> = {
@@ -58,9 +57,9 @@ const estadoConfig: Record<EstadoObra, { label: string; className: string }> = {
 };
 
 export default function Obras() {
-  const { obras, loading, createObra, updateObra, deleteObra } = useObras();
-  const { personal } = usePersonal();
-  const { clientes } = useClientes();
+  const { obras, personal, clientes, loading, createObra, updateObra, deleteObra } = useObras();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("obras.manage");
   
   const [searchTerm, setSearchTerm] = useState("");
   const [estadoFilter, setEstadoFilter] = useState<string>("todos");
@@ -84,9 +83,7 @@ export default function Obras() {
     cliente_id: undefined,
   });
 
-  const responsables = personal.filter(p => 
-    (p.rol === "capataz" || p.rol === "administrativo") && p.activo
-  );
+  const responsables = personal.filter((person) => person.activo);
 
   const filteredObras = obras.filter((obra) => {
     const term = searchTerm.toLowerCase();
@@ -152,14 +149,12 @@ export default function Obras() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    if (isEditing && selectedObra) {
-      await updateObra(selectedObra.id, formData);
-    } else {
-      await createObra(formData);
-    }
+    const saved = isEditing && selectedObra
+      ? await updateObra(selectedObra.id, formData)
+      : Boolean(await createObra(formData));
     
     setIsSubmitting(false);
-    setFormOpen(false);
+    if (saved) setFormOpen(false);
   };
 
   if (loading) {
@@ -200,10 +195,12 @@ export default function Obras() {
               <SelectItem value="finalizada">Finalizadas</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={handleNew} className="bg-primary hover:bg-primary/90 text-primary-foreground btn-industrial">
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Obra
-          </Button>
+          {canManage && (
+            <Button onClick={handleNew} className="bg-primary hover:bg-primary/90 text-primary-foreground btn-industrial">
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Obra
+            </Button>
+          )}
         </div>
       </div>
 
@@ -302,14 +299,18 @@ export default function Obras() {
                           <TrendingUp className="w-4 h-4 mr-2" />
                           Avance y certificados
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(obra)} className="text-foreground cursor-pointer">
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(obra)} className="text-destructive cursor-pointer">
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Eliminar
-                        </DropdownMenuItem>
+                        {canManage && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleEdit(obra)} className="text-foreground cursor-pointer">
+                              <Edit className="w-4 h-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDelete(obra)} className="text-destructive cursor-pointer">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -461,7 +462,11 @@ export default function Obras() {
           <DialogHeader>
             <DialogTitle>Avance de obra · {selectedObra?.nombre}</DialogTitle>
           </DialogHeader>
-          {selectedObra && <AvanceObraTab obraId={selectedObra.id} />}
+          <Alert>
+            <AlertDescription>
+              El avance y los certificados conservan su lugar en Obras, pero se habilitarán cuando ese backend sea migrado a v2.
+            </AlertDescription>
+          </Alert>
         </DialogContent>
       </Dialog>
 

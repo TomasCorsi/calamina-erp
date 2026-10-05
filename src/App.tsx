@@ -19,6 +19,7 @@ const TooltipProvider = lazy(() => import("@/components/ui/tooltip").then((modul
 const SessionKeepAlive = lazy(() => import("@/components/auth/SessionKeepAlive").then((module) => ({ default: module.SessionKeepAlive })));
 const OfflineBanner = lazy(() => import("@/components/pwa/OfflineBanner").then((module) => ({ default: module.OfflineBanner })));
 const Index = lazy(() => import("./pages/Index"));
+const Obras = lazy(() => import("./pages/Obras"));
 const Personal = lazy(() => import("./pages/Personal"));
 const Configuracion = lazy(() => import("./pages/Configuracion"));
 
@@ -38,7 +39,6 @@ const queryClient = new QueryClient({
 const pendingModules = [
   ["/dashboard", "Tablero de Obras", "Centro de control por obra"],
   ["/tablero/tv", "Tablero TV", "Centro de control de obras"],
-  ["/obras", "Obras", "Gestión de proyectos y obras"],
   ["/clientes", "Clientes", "Gestión de clientes"],
   ["/cotizaciones", "Cotizaciones", "Presupuestos y propuestas comerciales"],
   ["/certificados", "Certificados de Obra", "Gestión de certificaciones mensuales por obra"],
@@ -81,6 +81,7 @@ export default function App() {
                   <Route path="/sin-acceso" element={<NoAccess />} />
                   <Route path="/install" element={<Install />} />
                   <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                  <Route path="/obras" element={<ProtectedRoute requiredPermissions={["obras.view"]}><Obras /></ProtectedRoute>} />
                   <Route path="/personal" element={<ProtectedRoute requiredPermissions={["personal.view"]}><Personal /></ProtectedRoute>} />
                   <Route path="/configuracion" element={<ProtectedRoute requiredPermissions={["users.view", "users.invite", "users.manage_roles"]}><Configuracion /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<Navigate to="/configuracion" replace />} />

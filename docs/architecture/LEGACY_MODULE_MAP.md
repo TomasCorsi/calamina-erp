@@ -20,8 +20,8 @@ esquema anterior ni se presenta un shell alternativo.
 |---|---|---|---|---|
 | Inicio / Dashboard | `/`, `/dashboard` | `Index`, `Dashboard`, componentes `dashboard/*` | `obras`, `maquinarias`, `viajes`, `cotizaciones`, `personal_selector`, `mantenimientos` | Shell v2 activo; KPIs legacy pendientes de queries/RLS v2 por dominio. |
 | Tablero TV | `/tablero/tv` | `TableroTV`, `TableroVista` | `tablero_sesiones`, consultas agregadas de obras, partes, remitos, combustible, gastos, compras y mantenimiento | Pendiente; requiere modelo de lectura y, si se conserva actualización en vivo, revisar Realtime por separado. |
-| Obras | `/obras` | `Obras`, formularios y tablas de obra | `obras` | Pendiente prioritario; crear baseline de tabla, RLS y RPCs de alta/edición/estado. |
-| Clientes | `/clientes` | `Clientes` | `clientes` | Pendiente; CRUD directo legacy debe reemplazarse por RLS/RPCs. |
+| Obras | `/obras` | `Obras`, formularios, tabla y diálogos legacy | V2: `obras`, catálogo mínimo `clientes`, `personal` | Compatible v2 para listado, filtros, detalle y CRUD bajo `obras.view`/`obras.manage`. Avance y certificados siguen aislados hasta migrar esos dominios. |
+| Clientes | `/clientes` | `Clientes` | V2: catálogo mínimo `clientes` sólo para Obras; CRUD legacy aún aislado | La pantalla Clientes sigue pendiente; su catálogo v2 no habilita escrituras desde esa ruta. |
 | Cotizaciones | `/cotizaciones` | `Cotizaciones`, `ImportComputoDialog` | `cotizaciones`, `cotizacion_categorias`, `cotizacion_items`, `cotizacion_anticipos`, Edge `parse-computo` | Pendiente; modelar cabecera/items transaccionalmente y revisar la Edge de importación. |
 | Certificados | `/certificados` | `Certificados`, componentes `certificados/*` | `certificados`, `certificado_items`, `certificado_conceptos`, `certificado_pagos`, bucket `certificado-comprobantes` | Pendiente; requiere esquema, storage/policies y operaciones transaccionales. |
 | Personal | `/personal` | `Personal`, `EmpleadosTab`, `EmpleadoDialog`, tablas, filtros y diálogos compartidos | Legacy: `personal`, vacaciones, sueldos, EPP, documentos. V2: RPCs `list/create/update/set_personal_status` | Compatible para datos básicos v2. Se reutilizó la presentación; tabs laborales/documentales siguen pendientes. |
@@ -63,7 +63,7 @@ tablas/vistas que aún no existen en v2.
 
 ## Orden de migración
 
-1. Obras.
+1. Obras (completado para el alcance básico v2).
 2. Partes diarios.
 3. Remitos.
 4. Maquinarias y flota.
@@ -100,7 +100,7 @@ módulo activo, sin conectar temporalmente al backend anterior.
 | Auth e invitaciones | Compatible v2 con UI legacy | Media | Ahora |
 | Personal básico | Compatible v2 con UI legacy | Media | Ahora |
 | Configuración / Usuarios | Parcialmente compatible v2 | Media | Ahora |
-| Obras | Backend pendiente | Media | 1 |
+| Obras | Compatible v2 con UI legacy; avance/certificados pendientes | Media | Completado |
 | Parte Diario | Backend y cola offline pendientes | Muy alta | 2 |
 | Remitos | Cabecera, items e importación pendientes | Alta | 3 |
 | Maquinarias / Vehículos | Maestro, actividad y costos pendientes | Alta | 4 |
