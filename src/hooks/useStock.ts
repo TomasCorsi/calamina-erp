@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+const db = supabase as any;
 
 export type CategoriaStock = "material" | "repuesto" | "herramienta" | "consumible";
 export type TipoMovimientoStock = "entrada" | "salida" | "ajuste";
@@ -71,13 +74,16 @@ export interface MovimientoStockForm {
 }
 
 export function useStock() {
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
   const [items, setItems] = useState<StockItemDB[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchItems = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    if (!companyId) { setLoading(false); return; }
+    const { data, error } = await db
       .from("stock_items")
       .select("*")
       .order("nombre");
@@ -92,13 +98,14 @@ export function useStock() {
   };
 
   const fetchMovimientos = async () => {
-    const { data, error } = await supabase
+    if (!companyId) return;
+    const { data, error } = await db
       .from("movimientos_stock")
       .select(`
         *,
         item:stock_items(nombre, codigo),
         obra:obras(nombre),
-        responsable:personal(nombre, apellido)
+        responsable:personal!movimientos_stock_responsable_company_fkey(first_name, last_name)
       `)
       .order("fecha", { ascending: false })
       .limit(100);
@@ -106,14 +113,18 @@ export function useStock() {
     if (error) {
       console.error("Error fetching movimientos:", error);
     } else {
-      setMovimientos(data || []);
+      setMovimientos((data || []).map((row: any) => ({
+        ...row,
+        responsable: row.responsable ? { nombre: row.responsable.first_name, apellido: row.responsable.last_name } : null,
+      })));
     }
   };
 
   const createItem = async (item: StockItemForm) => {
-    const { data, error } = await supabase
+    if (!companyId) return null;
+    const { data, error } = await db
       .from("stock_items")
-      .insert([item])
+      .insert([{ company_id: companyId, ...item }])
       .select()
       .single();
 
@@ -129,7 +140,7 @@ export function useStock() {
   };
 
   const updateItem = async (id: string, item: Partial<StockItemForm>) => {
-    const { error } = await supabase
+    const { error } = await db
       .from("stock_items")
       .update(item)
       .eq("id", id);
@@ -146,7 +157,7 @@ export function useStock() {
   };
 
   const deleteItem = async (id: string) => {
-    const { error } = await supabase
+    const { error } = await db
       .from("stock_items")
       .delete()
       .eq("id", id);
@@ -163,28 +174,22 @@ export function useStock() {
   };
 
   const createMovimiento = async (mov: MovimientoStockForm) => {
-    // First, create the movement
-    const { data, error } = await supabase
-      .from("movimientos_stock")
-      .insert([mov])
-      .select()
-      .single();
+    const { data, error } = await db.schema("api").rpc("create_stock_movement", {
+      p_fecha: mov.fecha,
+      p_item_id: mov.item_id,
+      p_tipo: mov.tipo,
+      p_cantidad: mov.cantidad,
+      p_obra_id: mov.obra_id || null,
+      p_motivo: mov.motivo,
+      p_responsable_id: mov.responsable_id,
+      p_comprobante: mov.comprobante || null,
+      p_observaciones: mov.observaciones || null,
+    });
 
     if (error) {
       console.error("Error creating movimiento:", error);
       toast.error("Error al registrar movimiento");
       return null;
-    }
-
-    // Update the stock item
-    const { error: updateError } = await supabase
-      .from("stock_items")
-      .update({ stock_actual: mov.stock_nuevo })
-      .eq("id", mov.item_id);
-
-    if (updateError) {
-      console.error("Error updating stock:", updateError);
-      toast.error("Error al actualizar stock");
     }
 
     toast.success("Movimiento registrado correctamente");
@@ -196,7 +201,7 @@ export function useStock() {
   useEffect(() => {
     fetchItems();
     fetchMovimientos();
-  }, []);
+  }, [companyId]);
 
   return {
     items,

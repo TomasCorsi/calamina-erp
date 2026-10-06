@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, Fuel, Droplets, Download, CalendarDays, X, DollarSign, Save, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
+import { Search, Fuel, Droplets, Download, CalendarDays, X, DollarSign, Save, ChevronDown, ChevronUp, Pencil, Trash2, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCargasRepartidorAll, type CargaRepartidorFull } from "@/hooks/useCargasRepartidorAll";
 import { HistoricoBanner } from "@/components/shared/HistoricoBanner";
 import { usePreciosMes, usePreciosTodos } from "@/hooks/usePreciosMes";
-import { usePersonal } from "@/hooks/usePersonal";
+import { useOperationalPersonal } from "@/hooks/useOperationalPersonal";
 import { useMaquinarias } from "@/hooks/useMaquinarias";
 import { useObras } from "@/hooks/useObras";
 import { CargaCombustibleRepartidorDialog } from "@/components/parte-diario/CargaCombustibleRepartidorDialog";
@@ -196,8 +196,8 @@ function PreciosMesPanel({
 }
 
 export function CombustibleRepartidorTab() {
-  const { cargas, isLoading, updateCarga, deleteCarga, isUpdating, isDeleting, loadAll, cargarHistorico } = useCargasRepartidorAll();
-  const { personal } = usePersonal();
+  const { cargas, isLoading, createCarga, updateCarga, deleteCarga, isCreating, isUpdating, isDeleting, loadAll, cargarHistorico } = useCargasRepartidorAll();
+  const { personal } = useOperationalPersonal();
   const { maquinarias } = useMaquinarias();
   const { obras } = useObras();
 
@@ -484,6 +484,9 @@ export function CombustibleRepartidorTab() {
             ))}
           </SelectContent>
         </Select>
+        <Button onClick={() => { setEditingCarga(null); setShowEditDialog(true); }}>
+          <Plus className="w-4 h-4 mr-2" /> Nueva carga
+        </Button>
         <Button variant="outline" onClick={handleExport} className="border-border">
           <Download className="w-4 h-4 mr-2" />
           Excel
@@ -808,12 +811,12 @@ export function CombustibleRepartidorTab() {
         maquinarias={maquinarias}
         obras={obras}
         onSave={async (data) => {
-          if (!editingCarga) return;
-          await updateCarga({ id: editingCarga.id, ...data });
+          if (editingCarga) await updateCarga({ id: editingCarga.id, ...data });
+          else await createCarga(data);
           setShowEditDialog(false);
           setEditingCarga(null);
         }}
-        isSaving={isUpdating}
+        isSaving={isUpdating || isCreating}
       />
 
       {/* Delete Dialog */}

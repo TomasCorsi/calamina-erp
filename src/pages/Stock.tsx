@@ -28,7 +28,7 @@ import { Plus, Search, Eye, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, Aler
 import { useStock, StockItemDB, StockItemForm, MovimientoStockForm, CategoriaStock, TipoMovimientoStock } from "@/hooks/useStock";
 import { formatDate } from "@/lib/utils";
 import { useObras } from "@/hooks/useObras";
-import { usePersonal } from "@/hooks/usePersonal";
+import { useOperationalPersonal } from "@/hooks/useOperationalPersonal";
 
 const categoriaLabels: Record<string, string> = {
   material: "Material",
@@ -46,7 +46,7 @@ const tipoMovimientoLabels: Record<string, string> = {
 export default function Stock() {
   const { items, movimientos, loading, createItem, updateItem, deleteItem, createMovimiento } = useStock();
   const { obras } = useObras();
-  const { personal } = usePersonal();
+  const { personal } = useOperationalPersonal();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");

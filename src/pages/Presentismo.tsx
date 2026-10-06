@@ -26,7 +26,7 @@ import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 import { Plus, Search, Eye, Pencil, Trash2, Calendar, Users, Clock, Loader2 } from "lucide-react";
 import { usePresentismo, RegistroHHWithRelations, RegistroHHForm, EstadoPresentismo } from "@/hooks/usePresentismo";
 import { useObras } from "@/hooks/useObras";
-import { usePersonal } from "@/hooks/usePersonal";
+import { useOperationalPersonal } from "@/hooks/useOperationalPersonal";
 
 const estadoLabels: Record<string, string> = {
   presente: "Presente",
@@ -47,7 +47,7 @@ const estadoColors: Record<string, string> = {
 export default function Presentismo() {
   const { registros, loading, createRegistro, updateRegistro, deleteRegistro } = usePresentismo();
   const { obras } = useObras();
-  const { personal } = usePersonal();
+  const { personal } = useOperationalPersonal();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [fechaFilter, setFechaFilter] = useState(new Date().toISOString().split("T")[0]);

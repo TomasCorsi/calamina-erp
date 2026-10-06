@@ -25,6 +25,10 @@ const Configuracion = lazy(() => import("./pages/Configuracion"));
 const ParteDiario = lazy(() => import("./pages/ParteDiario"));
 const Remitos = lazy(() => import("./pages/Remitos"));
 const Maquinarias = lazy(() => import("./pages/Maquinarias"));
+const Gastos = lazy(() => import("./pages/Gastos"));
+const Mantenimiento = lazy(() => import("./pages/MantenimientoPage"));
+const Stock = lazy(() => import("./pages/Stock"));
+const Presentismo = lazy(() => import("./pages/Presentismo"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,12 +51,8 @@ const pendingModules = [
   ["/certificados", "Certificados de Obra", "Gestión de certificaciones mensuales por obra"],
   ["/viajes", "Viajes", "Registro de viajes y transporte"],
   ["/proveedores", "Proveedores", "Proveedores y órdenes de compra"],
-  ["/presentismo", "Presentismo (HH)", "Control de asistencia y horas trabajadas"],
   ["/liquidaciones", "Liquidación de Sueldos", "Quincena, mes, adelantos y préstamos"],
   ["/rrhh", "RRHH", "Novedades, sueldos y preparación de pagos"],
-  ["/gastos", "Combustible", "Control de entregas de combustible"],
-  ["/mantenimiento", "Mantenimiento", "Services y reparaciones"],
-  ["/stock", "Stock e Inventario", "Gestión de materiales, repuestos y herramientas"],
   ["/mensajes", "Mensajes", "Avisos y comunicación interna"],
   ["/reportes", "Reportes", "Análisis financiero y consultas"],
   ["/contabilidad", "Contabilidad", "Ventas, compras, pagos, asientos, IVA y reportes"],
@@ -86,6 +86,10 @@ export default function App() {
                   <Route path="/parte-diario" element={<ProtectedRoute requiredPermissions={["parte_diario.view"]}><ParteDiario /></ProtectedRoute>} />
                   <Route path="/remitos" element={<ProtectedRoute requiredPermissions={["remitos.view"]}><Remitos /></ProtectedRoute>} />
                   <Route path="/maquinarias" element={<ProtectedRoute requiredPermissions={["maquinarias.view"]}><Maquinarias /></ProtectedRoute>} />
+                  <Route path="/gastos" element={<ProtectedRoute requiredPermissions={["gastos.view", "combustible.view"]}><Gastos /></ProtectedRoute>} />
+                  <Route path="/mantenimiento" element={<ProtectedRoute requiredPermissions={["mantenimiento.view"]}><Mantenimiento /></ProtectedRoute>} />
+                  <Route path="/stock" element={<ProtectedRoute requiredPermissions={["stock.view"]}><Stock /></ProtectedRoute>} />
+                  <Route path="/presentismo" element={<ProtectedRoute requiredPermissions={["presentismo.view"]}><Presentismo /></ProtectedRoute>} />
                   <Route path="/configuracion" element={<ProtectedRoute requiredPermissions={["users.view", "users.invite", "users.manage_roles"]}><Configuracion /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<Navigate to="/configuracion" replace />} />
                   {pendingModules.map(([path, title, subtitle]) => (

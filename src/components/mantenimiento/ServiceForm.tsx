@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +15,7 @@ import {
 import { Loader2, Upload, ShieldCheck, ClipboardCheck } from "lucide-react";
 import { useMaquinarias } from "@/hooks/useMaquinarias";
 import { useMantenimientos, type MantenimientoForm, type MantenimientoWithRelations } from "@/hooks/useMantenimientos";
+import { useOperationalPersonal } from "@/hooks/useOperationalPersonal";
 import {
   CHECKLIST_CAMBIO_ITEMS,
   CHECKLIST_CHEQUEO_ITEMS,
@@ -63,23 +62,14 @@ export function ServiceForm({ onClose, editData }: ServiceFormProps) {
   const [costoManoObra, setCostoManoObra] = useState(String(editData?.costo_mano_obra || "0"));
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data: tecnicosOptions = [] } = useQuery({
-    queryKey: ["personal_tecnicos_service"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("personal_selector" as any)
-        .select("id, nombre, apellido, rol")
-        .in("rol", ["mecanico", "ayudante"])
-        .eq("activo", true)
-        .order("apellido") as { data: { id: string; nombre: string | null; apellido: string | null; rol: string }[] | null; error: any };
-      if (error) throw error;
-      return (data || []).map((p): ComboboxOption => ({
-        value: p.id,
-        label: `${p.apellido || ""} ${p.nombre || ""}`.trim() + ` (${p.rol === "mecanico" ? "Mecánico" : "Ayudante"})`,
-        searchValue: `${p.nombre || ""} ${p.apellido || ""}`.trim(),
-      }));
-    },
-  });
+  const { personal } = useOperationalPersonal();
+  const tecnicosOptions: ComboboxOption[] = personal
+    .filter((p) => p.activo)
+    .map((p) => ({
+      value: p.id,
+      label: `${p.apellido} ${p.nombre}${p.rol ? ` (${p.rol})` : ""}`,
+      searchValue: `${p.nombre} ${p.apellido}`,
+    }));
 
   const maquinariaOptions: ComboboxOption[] = maquinarias.map(m => ({
     value: m.id,

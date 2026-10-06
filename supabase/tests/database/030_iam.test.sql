@@ -3,11 +3,11 @@ set local search_path = public, extensions;
 select no_plan();
 
 select is((select count(*) from iam.roles), 5::bigint, 'five initial roles should exist');
-select is((select count(*) from iam.permissions), 13::bigint, 'thirteen permissions should exist after enabling Maquinarias');
+select is((select count(*) from iam.permissions), 23::bigint, 'twenty-three permissions should exist after enabling the operational block');
 
 select is(
   (select count(*) from iam.role_permissions where role_id = '10000000-0000-4000-8000-000000000001'),
-  13::bigint,
+  23::bigint,
   'admin should receive every current permission'
 );
 select is(

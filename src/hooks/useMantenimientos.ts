@@ -3,6 +3,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ChecklistCambio, ChecklistChequeo } from "@/components/mantenimiento/mantenimientoConstants";
+import { useAuth } from "@/hooks/useAuth";
+
+const db = supabase as any;
 
 const DEFAULT_DAYS_BACK = 90;
 const LOAD_ALL_SESSION_KEY = "mantenimientos:loadAll";
@@ -71,15 +74,15 @@ export interface MantenimientoForm {
 }
 
 const fetchMantenimientosFromDB = async (fechaDesde: string | null): Promise<MantenimientoWithRelations[]> => {
-  let query = (supabase as any)
-    .from("mantenimientos_list_view")
+  let query = db
+    .from("mantenimientos")
     .select(`
       id, fecha, maquinaria_id, tipo, descripcion, repuestos, costo_repuestos, costo_mano_obra,
       costo_total, horas_maquina, kilometros, tecnico, tecnico_id, estado, proximo_mantenimiento,
       proximo_service_km, proximo_service_hr, informe_tecnico, alerta_campo, checklist_cambio,
       checklist_chequeo, adjunto_url, observaciones, observacion_reporte_id, created_at, updated_at,
-      maquinaria_nombre, maquinaria_codigo, maquinaria_horas_acumuladas,
-      tecnico_nombre, tecnico_apellido
+      maquinaria:maquinarias!mantenimientos_maquinaria_company_fkey(nombre, codigo, horas_acumuladas),
+      tecnico_personal:personal!mantenimientos_tecnico_company_fkey(first_name, last_name)
     `)
     .order("fecha", { ascending: false });
 
@@ -89,18 +92,10 @@ const fetchMantenimientosFromDB = async (fechaDesde: string | null): Promise<Man
 
   const { data, error } = await query;
   if (error) throw error;
-  // Map flat columns back into nested relations to keep the existing component contract
   return (data || []).map((row: any) => ({
     ...row,
-    maquinaria: row.maquinaria_id
-      ? {
-          nombre: row.maquinaria_nombre,
-          codigo: row.maquinaria_codigo,
-          horas_acumuladas: row.maquinaria_horas_acumuladas,
-        }
-      : undefined,
-    tecnico_personal: row.tecnico_id
-      ? { nombre: row.tecnico_nombre, apellido: row.tecnico_apellido }
+    tecnico_personal: row.tecnico_personal
+      ? { nombre: row.tecnico_personal.first_name, apellido: row.tecnico_personal.last_name }
       : null,
   })) as MantenimientoWithRelations[];
 };
@@ -108,6 +103,8 @@ const fetchMantenimientosFromDB = async (fechaDesde: string | null): Promise<Man
 
 export function useMantenimientos() {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   const [loadAll, setLoadAll] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -138,6 +135,7 @@ export function useMantenimientos() {
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    enabled: Boolean(companyId),
   });
 
   const createMutation = useMutation({
@@ -146,9 +144,10 @@ export function useMantenimientos() {
       if (payload.checklist_cambio) payload.checklist_cambio = payload.checklist_cambio;
       if (payload.checklist_chequeo) payload.checklist_chequeo = payload.checklist_chequeo;
 
-      const { data, error } = await supabase
+      if (!companyId) throw new Error("No hay empresa activa");
+      const { data, error } = await db
         .from("mantenimientos")
-        .insert([payload])
+        .insert([{ company_id: companyId, ...payload }])
         .select()
         .single();
 
@@ -168,7 +167,7 @@ export function useMantenimientos() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, mant }: { id: string; mant: Partial<MantenimientoForm> }) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("mantenimientos")
         .update(mant as any)
         .eq("id", id)
@@ -193,7 +192,7 @@ export function useMantenimientos() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("mantenimientos")
         .delete()
         .eq("id", id);

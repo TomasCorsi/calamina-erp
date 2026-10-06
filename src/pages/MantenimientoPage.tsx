@@ -1,14 +1,12 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ObservacionesCampoTab } from "@/components/mantenimiento/ObservacionesCampoTab";
 import { ServiceForm } from "@/components/mantenimiento/ServiceForm";
 import { ReparacionForm } from "@/components/mantenimiento/ReparacionForm";
 import { MantenimientoDetail } from "@/components/mantenimiento/MantenimientoDetail";
-import { useObservacionesMaquina } from "@/hooks/useObservacionesMaquina";
 import {
   Select,
   SelectContent,
@@ -53,7 +51,7 @@ import { FilterBar, FilterState } from "@/components/shared/FilterBar";
 import { useMantenimientos, MantenimientoWithRelations, EstadoMantenimiento } from "@/hooks/useMantenimientos";
 import { useMaquinarias } from "@/hooks/useMaquinarias";
 import { useObras } from "@/hooks/useObras";
-import { useServiceAlerts, type ServiceAlert } from "@/hooks/useServiceAlerts";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn, formatDate } from "@/lib/utils";
 import { ESTADO_CONFIG, TIPO_CONFIG, formatCurrency } from "@/components/mantenimiento/mantenimientoConstants";
 import * as XLSX from "xlsx";
@@ -61,10 +59,20 @@ import { HistoricoBanner } from "@/components/shared/HistoricoBanner";
 
 export default function MantenimientoPage() {
   const { mantenimientos, loading, updateMantenimiento, deleteMantenimiento, loadAll, cargarHistorico } = useMantenimientos();
-  const { pendientes: obsPendientes } = useObservacionesMaquina();
   const { maquinarias } = useMaquinarias();
   const { obras } = useObras();
-  const { alerts: serviceAlerts, vencidosCount, proximosCount } = useServiceAlerts();
+  const serviceAlerts: Array<{
+    maquinaria: string;
+    maquinariaId: string;
+    unidad: "h" | "km";
+    actual: number;
+    limite: number;
+    diff: number;
+    pct: number;
+    estado: "vencido" | "proximo";
+  }> = [];
+  const vencidosCount: number = 0;
+  const proximosCount: number = 0;
 
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -78,25 +86,6 @@ export default function MantenimientoPage() {
   const [selectedMant, setSelectedMant] = useState<MantenimientoWithRelations | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [reparacionPrefill, setReparacionPrefill] = useState<{ maquinaria_id?: string; observacion_reporte_id?: string; alerta_campo?: string } | undefined>();
-
-  // Listen for "Crear Mantenimiento" from field reports
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      setActiveTab("reparaciones");
-      setFormType("reparacion");
-      setIsEditing(false);
-      setSelectedMant(null);
-      setReparacionPrefill({
-        maquinaria_id: detail.maquinaria_id,
-        observacion_reporte_id: detail.observacion_reporte_id,
-        alerta_campo: detail.alerta_campo,
-      });
-      setFormOpen(true);
-    };
-    window.addEventListener("crear-mantenimiento-desde-reporte", handler);
-    return () => window.removeEventListener("crear-mantenimiento-desde-reporte", handler);
-  }, []);
 
   const filterItems = useCallback((items: MantenimientoWithRelations[]) => {
     return items.filter((m) => {
@@ -363,11 +352,6 @@ export default function MantenimientoPage() {
           </TabsTrigger>
           <TabsTrigger value="reportes" className="relative gap-1.5">
             <AlertTriangle className="w-4 h-4" /> Reportes
-            {obsPendientes.length > 0 && (
-              <Badge className="ml-1 h-5 min-w-[20px] px-1.5 text-xs bg-destructive text-destructive-foreground">
-                {obsPendientes.length}
-              </Badge>
-            )}
           </TabsTrigger>
         </TabsList>
 
@@ -509,7 +493,13 @@ export default function MantenimientoPage() {
 
         {/* Reportes de Campo */}
         <TabsContent value="reportes">
-          <ObservacionesCampoTab />
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Reportes de campo pendientes de migración</AlertTitle>
+            <AlertDescription>
+              Services y reparaciones ya operan sobre Supabase v2. Esta pestaña conserva su lugar sin consultar el backend legacy.
+            </AlertDescription>
+          </Alert>
         </TabsContent>
       </Tabs>
 

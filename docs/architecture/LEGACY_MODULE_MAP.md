@@ -29,11 +29,11 @@ esquema anterior ni se presenta un shell alternativo.
 | Maquinarias / flota | `/maquinarias` | `Maquinarias`, `MaquinariasDataGrid`, formulario y detalle legacy | v2: `maquinarias`, relaciones con `obras` y `personal`; referenciada por `partes_diarios` y `remitos` | Maestro compatible v2: listado, filtros, alta, edición, estado, asignación y acumulados. Gastos, mantenimiento, combustible, costos, alertas, documentos e importación CSV permanecen visibles pero aislados. |
 | Viajes | `/viajes` | `Viajes` | `viajes` | Pendiente; CRUD directo y relaciones deben llevar RLS/RPC. |
 | Remitos | `/remitos` | `Remitos`, `RemitosSimpleGrid`, `RemitoQuickFormDialog`, `RemitoItemsEditor` | v2: `remitos`, `remito_items`, `obras`, `clientes`, `maquinarias`, `api.replace_remito_items` | Núcleo compatible v2: listado, filtros, alta, edición, baja e ítems atómicos. Importaciones CSV/Gaucho, liquidaciones y precios masivos siguen visibles pero aislados y deshabilitados hasta una migración específica. |
-| Gastos / Combustible | `/gastos` | `Gastos`, componentes `gastos/*` | `cargas_combustible_repartidor`, `otros_gastos`, obras y personal selector | Pendiente; separar carga operativa y aprobación/costo, con RPCs y auditoría. |
-| Mantenimiento | `/mantenimiento` | `MantenimientoPage`, formularios de service/reparación | `mantenimientos`, `mantenimientos_list_view`, `observaciones_maquina_estado`, `personal_selector` | Pendiente; reemplazar vistas y writes directos, definir responsables y estados. |
-| Stock | `/stock` | `Stock` | `stock_items`, `movimientos_stock` | Pendiente; movimientos deben ser RPC transaccional y el stock derivado no editable directamente. |
+| Gastos / Combustible | `/gastos` | `Gastos`, `GastosGeneralesTab`, `CombustibleRepartidorTab` y diálogos legacy | v2: `otros_gastos`, `cargas_combustible_repartidor`, `precios_productos_mes`, obras, maquinaria y personal | Núcleo compatible v2: listado, filtros, CRUD, precios mensuales, relaciones de empresa, RLS y auditoría. Aprobaciones, reportes e importaciones masivas quedan fuera. |
+| Mantenimiento | `/mantenimiento` | `MantenimientoPage`, formularios legacy de service/reparación y detalle | v2: `mantenimientos`, `maquinarias`, `personal`; sin vista legacy | Núcleo compatible v2: services, reparaciones, estados, costos y responsables. Reportes de campo, alertas automáticas, documentos y Storage permanecen visibles pero aislados. |
+| Stock | `/stock` | `Stock`, formularios y tablas legacy | v2: `stock_items`, `movimientos_stock`, RPC `api.create_stock_movement` | Compatible v2: ítems, filtros y movimientos. El saldo no es editable directamente y cada entrada/salida/ajuste se aplica transaccionalmente sin permitir stock negativo. |
 | Parte Diario | `/parte-diario` | `ParteDiario`, home, formulario, listado, detalle y vista administrativa legacy | `partes_diarios`, `obras`, maestro mínimo `maquinarias`, `api.list_parte_diario_personal_options`; borrador de formulario local | Núcleo compatible con v2. Rendimiento, faltantes, combustible, mantenimiento y alertas permanecen aislados sin consultas legacy. La cola offline anterior no se reenvía automáticamente. |
-| Presentismo | `/presentismo` | `Presentismo` | `registros_hh`, `personal` | Pendiente; definir fuente de verdad y reglas de corrección/auditoría. |
+| Presentismo | `/presentismo` | `Presentismo`, formulario, tabla, filtros y diálogos legacy | v2: `registros_hh`, `personal`, `obras` | Compatible v2 para registro, listado, corrección y baja bajo RLS; unicidad por persona/fecha, relaciones de empresa y auditoría server-side. |
 | Proveedores / Compras | `/proveedores` | `Proveedores`, componentes de órdenes e importación | `proveedores`, `ordenes_compra`, `orden_compra_items`, Edge `parse-orden-compra` | Pendiente; proveedores y órdenes requieren scopes, workflow mínimo y RPC cabecera/items. |
 | Liquidaciones | `/liquidaciones` | `Liquidaciones`, detalle, adelantos, préstamos y configuración | `liquidaciones`, `liquidacion_items`, `liquidacion_config_personal`, `adelantos_personal`, `prestamos_personal`, `prestamo_cuotas`, `sueldos` | Pendiente sensible; no montar hasta definir acceso salarial, auditoría y separación de funciones. |
 | RRHH | `/rrhh` | `RRHH`, `EmpleadoDialog`, planillas | `rrhh_periodos`, `rrhh_novedades`, `rrhh_jornada_config`, `rrhh_feriados`, `rrhh_sueldos_historial`, vacaciones | Pendiente sensible; requiere permisos distintos de Personal básico y protección de datos laborales. |
@@ -104,13 +104,13 @@ módulo activo, sin conectar temporalmente al backend anterior.
 | Parte Diario | Núcleo CRUD/RLS v2 operativo; extensiones legacy aisladas | Media | Compatible parcial |
 | Remitos | Cabecera, items e importación pendientes | Alta | 3 |
 | Maquinarias / Vehículos | Maestro, actividad y costos pendientes | Alta | 4 |
-| Gastos / Combustible | Operación, aprobación y auditoría pendientes | Alta | 5 |
+| Gastos / Combustible | Núcleo CRUD/RLS v2 operativo; aprobaciones y reportes pendientes | Media | Compatible parcial |
 | Proveedores / Compras | Workflow transaccional pendiente | Alta | 6 |
 | Clientes | CRUD y RLS pendientes | Media | 7 |
 | Viajes | Relaciones y RLS pendientes | Media | 7 |
-| Mantenimiento | Estados, vistas y responsables pendientes | Alta | 7 |
-| Stock | Movimientos transaccionales pendientes | Alta | 7 |
-| Presentismo | Reglas y correcciones auditadas pendientes | Media | 7 |
+| Mantenimiento | Núcleo de services/reparaciones v2; reportes, alertas y documentos pendientes | Media | Compatible parcial |
+| Stock | Maestro y movimientos transaccionales v2 operativos | Media | Compatible |
+| Presentismo | Registro y corrección auditada v2 operativos | Media | Compatible |
 | Cotizaciones | Cabecera, items e importación pendientes | Alta | 8 |
 | Certificados | Transacciones y Storage pendientes | Alta | 8 |
 | Mi Perfil / Mis Documentos | Profile parcial; Storage pendiente | Alta | 8 |

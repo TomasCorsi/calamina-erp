@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+const db = supabase as any;
 
 export type EstadoPresentismo = "presente" | "ausente" | "licencia" | "vacaciones" | "enfermedad";
 
@@ -44,22 +47,28 @@ export interface RegistroHHForm {
 }
 
 const fetchRegistrosFromDB = async (): Promise<RegistroHHWithRelations[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("registros_hh")
     .select(`
       *,
-      persona:personal!registros_hh_persona_id_fkey(nombre, apellido),
+      persona:personal!registros_hh_persona_id_fkey(first_name, last_name),
       obra:obras(nombre),
-      capataz:personal!registros_hh_capataz_id_fkey(nombre, apellido)
+      capataz:personal!registros_hh_capataz_id_fkey(first_name, last_name)
     `)
     .order("fecha", { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((row: any) => ({
+    ...row,
+    persona: row.persona ? { nombre: row.persona.first_name, apellido: row.persona.last_name } : null,
+    capataz: row.capataz ? { nombre: row.capataz.first_name, apellido: row.capataz.last_name } : null,
+  }));
 };
 
 export function usePresentismo() {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   const { 
     data: registros = [], 
@@ -68,13 +77,15 @@ export function usePresentismo() {
   } = useQuery({
     queryKey: ['presentismo'],
     queryFn: fetchRegistrosFromDB,
+    enabled: Boolean(companyId),
   });
 
   const createMutation = useMutation({
     mutationFn: async (registro: RegistroHHForm) => {
-      const { data, error } = await supabase
+      if (!companyId) throw new Error("No hay empresa activa");
+      const { data, error } = await db
         .from("registros_hh")
-        .insert([registro])
+        .insert([{ company_id: companyId, ...registro }])
         .select()
         .single();
 
@@ -94,7 +105,7 @@ export function usePresentismo() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, registro }: { id: string; registro: Partial<RegistroHHForm> }) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("registros_hh")
         .update(registro)
         .eq("id", id);
@@ -114,7 +125,7 @@ export function usePresentismo() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("registros_hh")
         .delete()
         .eq("id", id);

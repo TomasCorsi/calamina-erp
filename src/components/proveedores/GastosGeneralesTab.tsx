@@ -48,7 +48,6 @@ import {
   CategoriaGasto,
 } from "@/hooks/useOtrosGastos";
 import { useObras } from "@/hooks/useObras";
-import { useProveedores } from "@/hooks/useProveedores";
 import { useMaquinarias } from "@/hooks/useMaquinarias";
 import { Combobox } from "@/components/ui/combobox";
 import { SECTORES } from "./sectores";
@@ -66,16 +65,14 @@ function formatCurrency(value: number): string {
 export function GastosGeneralesTab() {
   const { gastos, createGasto, updateGasto, deleteGasto } = useOtrosGastos();
   const { obras } = useObras();
-  const { proveedores } = useProveedores();
   const { maquinarias } = useMaquinarias();
 
   const proveedorOptions = useMemo(() => {
-    const activos = proveedores.filter((p) => p.activo).map((p) => ({
-      value: p.nombre,
-      label: p.nombre,
-    }));
-    return [{ value: "__none__", label: "Sin proveedor" }, ...activos];
-  }, [proveedores]);
+    const existentes = Array.from(new Set(gastos.map((g) => g.proveedor).filter(Boolean)))
+      .sort()
+      .map((nombre) => ({ value: nombre!, label: nombre! }));
+    return [{ value: "__none__", label: "Sin proveedor" }, ...existentes];
+  }, [gastos]);
 
   const maquinariaLabel = (m: { codigo?: string | null; nombre?: string | null; patente?: string | null }) => {
     const parts: string[] = [];

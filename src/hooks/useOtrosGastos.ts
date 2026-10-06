@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { supabaseV2 } from "@/integrations/supabase/client";
+
+const db = supabaseV2 as any;
 
 export type CategoriaGasto = 
   | "alquiler"
@@ -55,7 +59,7 @@ export const categoriasGasto: Record<CategoriaGasto, { label: string; color: str
 };
 
 const fetchGastosFromDB = async (): Promise<OtroGastoWithRelations[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("otros_gastos")
     .select(`
       *,
@@ -71,6 +75,8 @@ const fetchGastosFromDB = async (): Promise<OtroGastoWithRelations[]> => {
 
 export function useOtrosGastos() {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   const { 
     data: gastos = [], 
@@ -79,13 +85,15 @@ export function useOtrosGastos() {
   } = useQuery({
     queryKey: ['otros-gastos'],
     queryFn: fetchGastosFromDB,
+    enabled: Boolean(companyId),
   });
 
   const createMutation = useMutation({
     mutationFn: async (gasto: OtroGastoForm) => {
-      const { data, error } = await supabase
+      if (!companyId) throw new Error("No hay empresa activa");
+      const { data, error } = await db
         .from("otros_gastos")
-        .insert([gasto])
+        .insert([{ company_id: companyId, ...gasto }])
         .select()
         .single();
 
@@ -105,7 +113,7 @@ export function useOtrosGastos() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, gasto }: { id: string; gasto: Partial<OtroGastoForm> }) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("otros_gastos")
         .update(gasto)
         .eq("id", id);
@@ -125,7 +133,7 @@ export function useOtrosGastos() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("otros_gastos")
         .delete()
         .eq("id", id);

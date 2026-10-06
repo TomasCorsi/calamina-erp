@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+
+const db = supabase as any;
 
 export interface CargaRepartidor {
   id: string;
@@ -44,21 +47,23 @@ export interface CargaRepartidorInsert {
 
 const SELECT_QUERY = `
   *,
-  operador:personal!cargas_combustible_repartidor_operador_id_fkey(nombre, apellido),
+  operador:personal!cargas_combustible_repartidor_operador_id_fkey(first_name, last_name),
   maquinaria:maquinarias!cargas_combustible_repartidor_maquinaria_id_fkey(codigo, tipo),
   obra:obras!cargas_combustible_repartidor_obra_id_fkey(nombre),
-  repartidor:personal!cargas_combustible_repartidor_repartidor_id_fkey(nombre, apellido)
+  repartidor:personal!cargas_combustible_repartidor_repartidor_id_fkey(first_name, last_name)
 `;
 
 export function useCargasRepartidor(parteDiarioId: string | null, repartidorId?: string | null) {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
   const queryMode = parteDiarioId ? 'parte' : repartidorId ? 'repartidor' : 'none';
   const queryId = parteDiarioId || repartidorId || 'none';
 
   const { data: cargas = [], isLoading } = useQuery({
     queryKey: ['cargas_combustible_repartidor', queryMode, queryId],
     queryFn: async () => {
-      let query = supabase
+      let query = db
         .from('cargas_combustible_repartidor')
         .select(SELECT_QUERY);
 
@@ -75,9 +80,13 @@ export function useCargasRepartidor(parteDiarioId: string | null, repartidorId?:
         throw error;
       }
 
-      return data as CargaRepartidor[];
+      return (data || []).map((row: any) => ({
+        ...row,
+        operador: row.operador ? { nombre: row.operador.first_name, apellido: row.operador.last_name } : null,
+        repartidor: row.repartidor ? { nombre: row.repartidor.first_name, apellido: row.repartidor.last_name } : null,
+      })) as CargaRepartidor[];
     },
-    enabled: queryMode !== 'none',
+    enabled: queryMode !== 'none' && Boolean(companyId),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
@@ -86,9 +95,10 @@ export function useCargasRepartidor(parteDiarioId: string | null, repartidorId?:
 
   const createMutation = useMutation({
     mutationFn: async (carga: CargaRepartidorInsert) => {
-      const { data, error } = await supabase
+      if (!companyId) throw new Error('No hay empresa activa');
+      const { data, error } = await db
         .from('cargas_combustible_repartidor')
-        .insert(carga)
+        .insert({ company_id: companyId, ...carga })
         .select(SELECT_QUERY)
         .single();
 
@@ -108,7 +118,7 @@ export function useCargasRepartidor(parteDiarioId: string | null, repartidorId?:
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<CargaRepartidorInsert> & { id: string }) => {
-      const { data: updated, error } = await supabase
+      const { data: updated, error } = await db
         .from('cargas_combustible_repartidor')
         .update(data)
         .eq('id', id)
@@ -131,7 +141,7 @@ export function useCargasRepartidor(parteDiarioId: string | null, repartidorId?:
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from('cargas_combustible_repartidor')
         .delete()
         .eq('id', id);
