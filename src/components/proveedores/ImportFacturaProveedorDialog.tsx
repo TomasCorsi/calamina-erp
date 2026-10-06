@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Loader2, FileSpreadsheet, Image as ImageIcon, FileText, Check, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 
 export interface ParsedOrdenCompra {
@@ -126,33 +125,7 @@ export function ImportFacturaProveedorDialog({ open, onOpenChange, onImport }: P
       toast.error("Subí un archivo o pegá el texto");
       return;
     }
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("parse-orden-compra", {
-        body: {
-          content: textContent,
-          type: contentKind,
-          instrucciones: instrucciones.trim() || undefined,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const parsed = data as ParsedOrdenCompra;
-      if (!parsed.items || parsed.items.length === 0) {
-        toast.warning("No se detectaron ítems. Revisá el archivo.");
-      } else {
-        toast.success(`Se detectaron ${parsed.items.length} ítems`);
-      }
-      setPreview(parsed);
-    } catch (err: any) {
-      console.error(err);
-      const msg = err?.message || "Error al procesar con IA";
-      if (msg.includes("agotados")) toast.error("Créditos de IA agotados");
-      else if (msg.includes("Demasiadas")) toast.error("Límite alcanzado, intentá en un momento");
-      else toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
+    toast.info("La importación asistida quedará habilitada cuando exista una función v2 segura");
   };
 
   const apply = () => {

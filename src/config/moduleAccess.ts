@@ -16,6 +16,10 @@ export function canAccessModule(path: string, context: ModuleAccessContext): boo
   if (path === "/mantenimiento") return context.permissions.has("mantenimiento.view");
   if (path === "/stock") return context.permissions.has("stock.view");
   if (path === "/presentismo") return context.permissions.has("presentismo.view");
+  if (path === "/clientes") return context.permissions.has("clientes.view");
+  if (path === "/proveedores") return context.permissions.has("proveedores.view") || context.permissions.has("compras.view");
+  if (path === "/cotizaciones") return context.permissions.has("cotizaciones.view");
+  if (path === "/certificados") return context.permissions.has("certificados.view");
   if (path === "/configuracion" || path === "/usuarios") {
     return USER_MANAGEMENT_PERMISSIONS.some((permission) => context.permissions.has(permission));
   }

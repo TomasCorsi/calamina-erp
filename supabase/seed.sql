@@ -457,3 +457,91 @@ insert into public.registros_hh (
   '07:00', '16:00', 8, 0, 8, 'Tarea operativa demo', 'presente',
   'Registro ficticio para validacion local.'
 ) on conflict (company_id, persona_id, fecha) do update set tarea = excluded.tarea, estado = excluded.estado;
+
+-- Commercial block: synthetic local-only records.
+insert into public.proveedores (
+  id, company_id, nombre, cuit, direccion, localidad, telefono, email, contacto, rubro, observaciones
+) values (
+  '00000000-0000-4000-8015-000000000001',
+  '00000000-0000-4000-8000-000000000001',
+  'Proveedor Comercial Demo', '30-00000000-1', 'Calle Ficticia 100', 'Buenos Aires',
+  '1100000000', 'proveedor.demo@example.invalid', 'Contacto Demo', 'Materiales',
+  'Dato enteramente ficticio para validación local.'
+) on conflict (id) do update set nombre = excluded.nombre, observaciones = excluded.observaciones;
+
+insert into public.ordenes_compra (
+  id, company_id, numero, fecha, proveedor_id, obra_id, estado, subtotal, iva, total, observaciones
+) values (
+  '00000000-0000-4000-8016-000000000001',
+  '00000000-0000-4000-8000-000000000001', 'OC-DEMO-001', '2026-10-06',
+  '00000000-0000-4000-8015-000000000001',
+  '00000000-0000-4000-8003-000000000001', 'borrador', 10000, 2100, 12100,
+  'Orden ficticia para validación local.'
+) on conflict (id) do update set subtotal = excluded.subtotal, iva = excluded.iva, total = excluded.total;
+
+insert into public.orden_compra_items (
+  id, company_id, orden_id, articulo, descripcion, unidad, cantidad, precio_unitario, subtotal, orden
+) values (
+  '00000000-0000-4000-8016-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8016-000000000001', 'MAT-DEMO', 'Material comercial demo',
+  'un', 2, 5000, 10000, 0
+) on conflict (id) do update set cantidad = excluded.cantidad, subtotal = excluded.subtotal;
+
+insert into public.cotizaciones (
+  id, company_id, numero, obra_id, descripcion, estado, fecha_creacion, fecha_vencimiento,
+  responsable, subtotal, iva, total, notas
+) values (
+  '00000000-0000-4000-8017-000000000001',
+  '00000000-0000-4000-8000-000000000001', 'COT-DEMO-001',
+  '00000000-0000-4000-8003-000000000001', 'Cotización comercial demo', 'borrador',
+  '2026-10-06', '2026-11-06', 'Responsable Demo', 20000, 4200, 24200,
+  'Cotización ficticia para validación local.'
+) on conflict (id) do update set descripcion = excluded.descripcion, total = excluded.total;
+
+insert into public.cotizacion_categorias (
+  id, company_id, cotizacion_id, numero, nombre, orden
+) values (
+  '00000000-0000-4000-8017-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8017-000000000001', 1, 'Trabajos demo', 0
+) on conflict (id) do update set nombre = excluded.nombre;
+
+insert into public.cotizacion_items (
+  id, company_id, cotizacion_id, categoria_id, numero, descripcion, unidad,
+  cantidad, precio_unitario, subtotal, total
+) values (
+  '00000000-0000-4000-8017-000000000003',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8017-000000000001',
+  '00000000-0000-4000-8017-000000000002', '1', 'Servicio comercial demo',
+  'un', 1, 20000, 20000, 20000
+) on conflict (id) do update set descripcion = excluded.descripcion, total = excluded.total;
+
+insert into public.certificado_conceptos (
+  id, company_id, obra_id, nombre, unidad, precio_unitario, orden, categoria, cantidad_total, tipo
+) values (
+  '00000000-0000-4000-8018-000000000001',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8003-000000000001', 'Concepto certificable demo', 'un',
+  15000, 0, 'General', 1, 'obra'
+) on conflict (id) do update set nombre = excluded.nombre, precio_unitario = excluded.precio_unitario;
+
+insert into public.certificados (
+  id, company_id, obra_id, numero, periodo, estado, fecha_certificado,
+  subtotal, iva, total, observaciones, tipo
+) values (
+  '00000000-0000-4000-8018-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8003-000000000001', 'CERT-DEMO-001', '2026-10', 'borrador',
+  '2026-10-06', 15000, 3150, 18150, 'Certificado ficticio para validación local.', 'obra'
+) on conflict (id) do update set subtotal = excluded.subtotal, iva = excluded.iva, total = excluded.total;
+
+insert into public.certificado_items (
+  id, company_id, certificado_id, concepto_id, descripcion, unidad, cantidad, precio_unitario, subtotal
+) values (
+  '00000000-0000-4000-8018-000000000003',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8018-000000000002',
+  '00000000-0000-4000-8018-000000000001', 'Concepto certificable demo', 'un', 1, 15000, 15000
+) on conflict (id) do update set cantidad = excluded.cantidad, subtotal = excluded.subtotal;

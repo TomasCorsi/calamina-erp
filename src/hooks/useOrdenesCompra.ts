@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+const db = supabase as any;
 
 export type EstadoOrdenCompra = "borrador" | "emitida" | "recibida" | "cancelada";
 export type MonedaOrdenCompra = "ARS" | "USD";
@@ -91,7 +94,7 @@ export interface OrdenCompraForm {
 }
 
 const fetchOrdenes = async (): Promise<OrdenCompraWithRelations[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("ordenes_compra")
     .select(`
       *,
@@ -159,36 +162,24 @@ function buildPayload(form: OrdenCompraForm, includeNumero = false) {
 
 export function useOrdenesCompra() {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   const { data: ordenes = [], isLoading: loading, refetch } = useQuery({
-    queryKey: ["ordenes_compra"],
+    queryKey: ["ordenes_compra", companyId],
     queryFn: fetchOrdenes,
+    enabled: Boolean(companyId),
   });
 
   const createMutation = useMutation({
     mutationFn: async (form: OrdenCompraForm) => {
-      const { data: orden, error } = await supabase
-        .from("ordenes_compra")
-        .insert([{ numero: "", ...buildPayload(form) }])
-        .select()
-        .single();
+      const { data: orderId, error } = await db.schema("api").rpc("save_purchase_order", {
+        p_order: { numero: form.numero || "", ...buildPayload(form) },
+        p_items: form.items,
+        p_id: null,
+      });
       if (error) throw error;
-
-      if (form.items.length > 0) {
-        const itemsToInsert = form.items.map((it, idx) => ({
-          orden_id: orden.id,
-          articulo: it.articulo?.trim() || null,
-          descripcion: it.descripcion,
-          unidad: it.unidad || "un",
-          cantidad: Number(it.cantidad) || 0,
-          precio_unitario: Number(it.precio_unitario) || 0,
-          subtotal: (Number(it.cantidad) || 0) * (Number(it.precio_unitario) || 0),
-          orden: idx,
-        }));
-        const { error: itemsErr } = await supabase.from("orden_compra_items").insert(itemsToInsert);
-        if (itemsErr) throw itemsErr;
-      }
-      return orden;
+      return orderId;
     },
     onSuccess: () => {
       toast.success("Orden de compra creada");
@@ -202,30 +193,10 @@ export function useOrdenesCompra() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, form }: { id: string; form: OrdenCompraForm }) => {
-      const { error } = await supabase
-        .from("ordenes_compra")
-        .update(buildPayload(form, true))
-        .eq("id", id);
+      const { error } = await db.schema("api").rpc("save_purchase_order", {
+        p_order: buildPayload(form, true), p_items: form.items, p_id: id,
+      });
       if (error) throw error;
-
-
-      const { error: delErr } = await supabase.from("orden_compra_items").delete().eq("orden_id", id);
-      if (delErr) throw delErr;
-
-      if (form.items.length > 0) {
-        const itemsToInsert = form.items.map((it, idx) => ({
-          orden_id: id,
-          articulo: it.articulo?.trim() || null,
-          descripcion: it.descripcion,
-          unidad: it.unidad || "un",
-          cantidad: Number(it.cantidad) || 0,
-          precio_unitario: Number(it.precio_unitario) || 0,
-          subtotal: (Number(it.cantidad) || 0) * (Number(it.precio_unitario) || 0),
-          orden: idx,
-        }));
-        const { error: insErr } = await supabase.from("orden_compra_items").insert(itemsToInsert);
-        if (insErr) throw insErr;
-      }
     },
     onSuccess: () => {
       toast.success("Orden actualizada");
@@ -239,7 +210,7 @@ export function useOrdenesCompra() {
 
   const updateEstadoMutation = useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: EstadoOrdenCompra }) => {
-      const { error } = await supabase.from("ordenes_compra").update({ estado }).eq("id", id);
+      const { error } = await db.from("ordenes_compra").update({ estado }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -254,7 +225,7 @@ export function useOrdenesCompra() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("ordenes_compra").delete().eq("id", id);
+      const { error } = await db.from("ordenes_compra").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

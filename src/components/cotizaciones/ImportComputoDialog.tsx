@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Loader2, FileSpreadsheet, Image, FileText, Check, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { CotizacionCategoriaForm, CotizacionItemForm, calcularTotalItem } from "@/hooks/useCotizaciones";
 import * as XLSX from "xlsx";
 
@@ -89,24 +88,7 @@ export function ImportComputoDialog({ open, onOpenChange, onImportComplete }: Im
       toast.error("No hay contenido para procesar");
       return;
     }
-    setLoading(true);
-    try {
-      const isImage = textContent.startsWith("data:image/");
-      const { data, error } = await supabase.functions.invoke("parse-computo", {
-        body: { content: textContent, type: isImage ? "image" : "text", instrucciones: instrucciones.trim() || undefined },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      setPreview(data as ExtractedData);
-      toast.success("Cómputo extraído correctamente");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Error al procesar con IA");
-    } finally {
-      setLoading(false);
-    }
+    toast.info("La importación asistida quedará habilitada cuando exista una función v2 segura");
   };
 
   const applyToForm = () => {

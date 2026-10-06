@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+const db = supabase as any;
 
 export interface ClienteDB {
   id: string;
@@ -30,7 +33,7 @@ export interface ClienteForm {
 }
 
 const fetchClientesFromDB = async (): Promise<ClienteDB[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("clientes")
     .select("*")
     .order("nombre", { ascending: true });
@@ -41,19 +44,24 @@ const fetchClientesFromDB = async (): Promise<ClienteDB[]> => {
 
 export function useClientes() {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   const {
     data: clientes = [],
     isLoading: loading,
     refetch: fetchClientes,
   } = useQuery({
-    queryKey: ["clientes"],
+    queryKey: ["clientes", companyId],
     queryFn: fetchClientesFromDB,
+    enabled: Boolean(companyId),
   });
 
   const createMutation = useMutation({
     mutationFn: async (cliente: ClienteForm) => {
+      if (!companyId) throw new Error("No hay empresa activa");
       const insertData = {
+        company_id: companyId,
         nombre: cliente.nombre,
         cuit: cliente.cuit || null,
         direccion: cliente.direccion || null,
@@ -64,7 +72,7 @@ export function useClientes() {
         observaciones: cliente.observaciones || null,
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("clientes")
         .insert([insertData])
         .select()
@@ -85,7 +93,7 @@ export function useClientes() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, cliente }: { id: string; cliente: Partial<ClienteForm> }) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("clientes")
         .update(cliente)
         .eq("id", id);
@@ -104,15 +112,15 @@ export function useClientes() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("clientes")
-        .delete()
+        .update({ activo: false })
         .eq("id", id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Cliente eliminado correctamente");
+      toast.success("Cliente desactivado correctamente");
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     },
     onError: (error) => {

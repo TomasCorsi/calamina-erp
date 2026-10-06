@@ -29,6 +29,10 @@ const Gastos = lazy(() => import("./pages/Gastos"));
 const Mantenimiento = lazy(() => import("./pages/MantenimientoPage"));
 const Stock = lazy(() => import("./pages/Stock"));
 const Presentismo = lazy(() => import("./pages/Presentismo"));
+const Clientes = lazy(() => import("./pages/Clientes"));
+const Proveedores = lazy(() => import("./pages/Proveedores"));
+const Cotizaciones = lazy(() => import("./pages/Cotizaciones"));
+const Certificados = lazy(() => import("./pages/Certificados"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,11 +50,7 @@ const queryClient = new QueryClient({
 const pendingModules = [
   ["/dashboard", "Tablero de Obras", "Centro de control por obra"],
   ["/tablero/tv", "Tablero TV", "Centro de control de obras"],
-  ["/clientes", "Clientes", "Gestión de clientes"],
-  ["/cotizaciones", "Cotizaciones", "Presupuestos y propuestas comerciales"],
-  ["/certificados", "Certificados de Obra", "Gestión de certificaciones mensuales por obra"],
   ["/viajes", "Viajes", "Registro de viajes y transporte"],
-  ["/proveedores", "Proveedores", "Proveedores y órdenes de compra"],
   ["/liquidaciones", "Liquidación de Sueldos", "Quincena, mes, adelantos y préstamos"],
   ["/rrhh", "RRHH", "Novedades, sueldos y preparación de pagos"],
   ["/mensajes", "Mensajes", "Avisos y comunicación interna"],
@@ -90,6 +90,10 @@ export default function App() {
                   <Route path="/mantenimiento" element={<ProtectedRoute requiredPermissions={["mantenimiento.view"]}><Mantenimiento /></ProtectedRoute>} />
                   <Route path="/stock" element={<ProtectedRoute requiredPermissions={["stock.view"]}><Stock /></ProtectedRoute>} />
                   <Route path="/presentismo" element={<ProtectedRoute requiredPermissions={["presentismo.view"]}><Presentismo /></ProtectedRoute>} />
+                  <Route path="/clientes" element={<ProtectedRoute requiredPermissions={["clientes.view"]}><Clientes /></ProtectedRoute>} />
+                  <Route path="/proveedores" element={<ProtectedRoute requiredPermissions={["proveedores.view", "compras.view"]}><Proveedores /></ProtectedRoute>} />
+                  <Route path="/cotizaciones" element={<ProtectedRoute requiredPermissions={["cotizaciones.view"]}><Cotizaciones /></ProtectedRoute>} />
+                  <Route path="/certificados" element={<ProtectedRoute requiredPermissions={["certificados.view"]}><Certificados /></ProtectedRoute>} />
                   <Route path="/configuracion" element={<ProtectedRoute requiredPermissions={["users.view", "users.invite", "users.manage_roles"]}><Configuracion /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<Navigate to="/configuracion" replace />} />
                   {pendingModules.map(([path, title, subtitle]) => (

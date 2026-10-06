@@ -1,6 +1,6 @@
 # Inventario funcional y mapa de migración del frontend legacy
 
-Fecha de revisión: 2026-10-02.
+Fecha de revisión: 2026-10-06.
 
 Este inventario se obtuvo de `src/App.tsx`, `src/pages/`,
 `src/components/layout/Sidebar.tsx`, `AppLauncher.tsx`, hooks y consultas
@@ -21,9 +21,9 @@ esquema anterior ni se presenta un shell alternativo.
 | Inicio / Dashboard | `/`, `/dashboard` | `Index`, `Dashboard`, componentes `dashboard/*` | `obras`, `maquinarias`, `viajes`, `cotizaciones`, `personal_selector`, `mantenimientos` | Shell v2 activo; KPIs legacy pendientes de queries/RLS v2 por dominio. |
 | Tablero TV | `/tablero/tv` | `TableroTV`, `TableroVista` | `tablero_sesiones`, consultas agregadas de obras, partes, remitos, combustible, gastos, compras y mantenimiento | Pendiente; requiere modelo de lectura y, si se conserva actualización en vivo, revisar Realtime por separado. |
 | Obras | `/obras` | `Obras`, formularios, tabla y diálogos legacy | V2: `obras`, catálogo mínimo `clientes`, `personal` | Compatible v2 para listado, filtros, detalle y CRUD bajo `obras.view`/`obras.manage`. Avance y certificados siguen aislados hasta migrar esos dominios. |
-| Clientes | `/clientes` | `Clientes` | V2: catálogo mínimo `clientes` sólo para Obras; CRUD legacy aún aislado | La pantalla Clientes sigue pendiente; su catálogo v2 no habilita escrituras desde esa ruta. |
-| Cotizaciones | `/cotizaciones` | `Cotizaciones`, `ImportComputoDialog` | `cotizaciones`, `cotizacion_categorias`, `cotizacion_items`, `cotizacion_anticipos`, Edge `parse-computo` | Pendiente; modelar cabecera/items transaccionalmente y revisar la Edge de importación. |
-| Certificados | `/certificados` | `Certificados`, componentes `certificados/*` | `certificados`, `certificado_items`, `certificado_conceptos`, `certificado_pagos`, bucket `certificado-comprobantes` | Pendiente; requiere esquema, storage/policies y operaciones transaccionales. |
+| Clientes | `/clientes` | `Clientes`, tabla, filtros y formulario legacy | V2: `clientes` compartido con Obras | Compatible v2 para listado, alta, edición y desactivación bajo `clientes.view`/`clientes.manage`; conserva la relación ya usada por Obras. |
+| Cotizaciones | `/cotizaciones` | `Cotizaciones`, formulario de cabecera, categorías, ítems y anticipos | V2: `cotizaciones`, `cotizacion_categorias`, `cotizacion_items`, `cotizacion_anticipos`, RPC `api.save_quote` | Núcleo compatible v2 y transaccional. La importación asistida `parse-computo` permanece visible pero no ejecuta Edge Functions hasta tener una implementación v2 segura. |
+| Certificados | `/certificados` | `Certificados`, componentes `certificados/*` | V2: `certificados`, `certificado_items`, `certificado_conceptos`, `certificado_pagos`, RPC `api.save_certificate` | Núcleo compatible v2: conceptos, certificados, ítems y pagos. Adjuntos de comprobantes/Storage quedan diferidos y no generan requests. |
 | Personal | `/personal` | `Personal`, `EmpleadosTab`, `EmpleadoDialog`, tablas, filtros y diálogos compartidos | Legacy: `personal`, vacaciones, sueldos, EPP, documentos. V2: RPCs `list/create/update/set_personal_status` | Compatible para datos básicos v2. Se reutilizó la presentación; tabs laborales/documentales siguen pendientes. |
 | Usuarios | legacy dentro de Configuración; v2 `/usuarios` | `UserManagement`, `LinkUserDialog`, diálogos de email/password | Legacy: `profiles`, `user_roles`, `personal`, Edge de cambio de email/password. V2: memberships, IAM, invitaciones y RPCs de gestión | Compatible para listado, invitación, roles asignables y suspensión. Cambio de email/password y vínculo manual quedan pendientes. |
 | Maquinarias / flota | `/maquinarias` | `Maquinarias`, `MaquinariasDataGrid`, formulario y detalle legacy | v2: `maquinarias`, relaciones con `obras` y `personal`; referenciada por `partes_diarios` y `remitos` | Maestro compatible v2: listado, filtros, alta, edición, estado, asignación y acumulados. Gastos, mantenimiento, combustible, costos, alertas, documentos e importación CSV permanecen visibles pero aislados. |
@@ -34,7 +34,7 @@ esquema anterior ni se presenta un shell alternativo.
 | Stock | `/stock` | `Stock`, formularios y tablas legacy | v2: `stock_items`, `movimientos_stock`, RPC `api.create_stock_movement` | Compatible v2: ítems, filtros y movimientos. El saldo no es editable directamente y cada entrada/salida/ajuste se aplica transaccionalmente sin permitir stock negativo. |
 | Parte Diario | `/parte-diario` | `ParteDiario`, home, formulario, listado, detalle y vista administrativa legacy | `partes_diarios`, `obras`, maestro mínimo `maquinarias`, `api.list_parte_diario_personal_options`; borrador de formulario local | Núcleo compatible con v2. Rendimiento, faltantes, combustible, mantenimiento y alertas permanecen aislados sin consultas legacy. La cola offline anterior no se reenvía automáticamente. |
 | Presentismo | `/presentismo` | `Presentismo`, formulario, tabla, filtros y diálogos legacy | v2: `registros_hh`, `personal`, `obras` | Compatible v2 para registro, listado, corrección y baja bajo RLS; unicidad por persona/fecha, relaciones de empresa y auditoría server-side. |
-| Proveedores / Compras | `/proveedores` | `Proveedores`, componentes de órdenes e importación | `proveedores`, `ordenes_compra`, `orden_compra_items`, Edge `parse-orden-compra` | Pendiente; proveedores y órdenes requieren scopes, workflow mínimo y RPC cabecera/items. |
+| Proveedores / Compras | `/proveedores` | `Proveedores`, tabs, formularios y tabla de órdenes legacy | V2: `proveedores`, `ordenes_compra`, `orden_compra_items`, RPC `api.save_purchase_order` | Compatible v2 para proveedores y órdenes con cabecera/ítems transaccionales. La importación asistida `parse-orden-compra` queda diferida y sin requests. |
 | Liquidaciones | `/liquidaciones` | `Liquidaciones`, detalle, adelantos, préstamos y configuración | `liquidaciones`, `liquidacion_items`, `liquidacion_config_personal`, `adelantos_personal`, `prestamos_personal`, `prestamo_cuotas`, `sueldos` | Pendiente sensible; no montar hasta definir acceso salarial, auditoría y separación de funciones. |
 | RRHH | `/rrhh` | `RRHH`, `EmpleadoDialog`, planillas | `rrhh_periodos`, `rrhh_novedades`, `rrhh_jornada_config`, `rrhh_feriados`, `rrhh_sueldos_historial`, vacaciones | Pendiente sensible; requiere permisos distintos de Personal básico y protección de datos laborales. |
 | Reportes | `/reportes` | `Reportes`, hooks de reporte de obra | Lecturas agregadas de obras, remitos, partes, horas, maquinaria, personal/sueldos, combustible, compras, gastos, cotizaciones y clientes | Pendiente hasta migrar sus fuentes; no debe consultar el esquema legacy ni reactivar IA archivada. |
@@ -105,14 +105,14 @@ módulo activo, sin conectar temporalmente al backend anterior.
 | Remitos | Cabecera, items e importación pendientes | Alta | 3 |
 | Maquinarias / Vehículos | Maestro, actividad y costos pendientes | Alta | 4 |
 | Gastos / Combustible | Núcleo CRUD/RLS v2 operativo; aprobaciones y reportes pendientes | Media | Compatible parcial |
-| Proveedores / Compras | Workflow transaccional pendiente | Alta | 6 |
-| Clientes | CRUD y RLS pendientes | Media | 7 |
+| Proveedores / Compras | CRUD y workflow cabecera/ítems v2 operativos; importación asistida pendiente | Media | Compatible |
+| Clientes | CRUD/RLS v2 operativo | Baja | Compatible |
 | Viajes | Relaciones y RLS pendientes | Media | 7 |
 | Mantenimiento | Núcleo de services/reparaciones v2; reportes, alertas y documentos pendientes | Media | Compatible parcial |
 | Stock | Maestro y movimientos transaccionales v2 operativos | Media | Compatible |
 | Presentismo | Registro y corrección auditada v2 operativos | Media | Compatible |
-| Cotizaciones | Cabecera, items e importación pendientes | Alta | 8 |
-| Certificados | Transacciones y Storage pendientes | Alta | 8 |
+| Cotizaciones | Cabecera, ítems, estados y totales v2 operativos; importación asistida pendiente | Media | Compatible parcial |
+| Certificados | Conceptos, cabecera/ítems y pagos v2 operativos; Storage pendiente | Media | Compatible parcial |
 | Mi Perfil / Mis Documentos | Profile parcial; Storage pendiente | Alta | 8 |
 | RRHH / Liquidaciones | Datos laborales y salariales sensibles | Muy alta | 9 |
 | Mensajes | Teléfono, privacidad y fuentes pendientes | Media | 9 |

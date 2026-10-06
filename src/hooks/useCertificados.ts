@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+const db = supabase as any;
 
 // ---- Types ----
 
@@ -231,6 +234,8 @@ export async function fetchAcumulados(
 
 export function useCertificados(obraId?: string) {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   // Conceptos for selected obra
   const { data: conceptos = [], isLoading: loadingConceptos } = useQuery({
@@ -251,7 +256,7 @@ export function useCertificados(obraId?: string) {
         tipo: (d.tipo === 'obra' ? 'obra' : 'servicio') as 'obra' | 'servicio',
       })) as CertificadoConcepto[];
     },
-    enabled: !!obraId,
+    enabled: !!obraId && !!companyId,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
@@ -276,7 +281,7 @@ export function useCertificados(obraId?: string) {
         incluir_iva: d.incluir_iva !== false,
       })) as Certificado[];
     },
-    enabled: !!obraId,
+    enabled: !!obraId && !!companyId,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
@@ -321,9 +326,10 @@ export function useCertificados(obraId?: string) {
 
   const createConcepto = useMutation({
     mutationFn: async (concepto: ConceptoForm) => {
-      const { data, error } = await supabase
+      if (!companyId) throw new Error("No hay empresa activa");
+      const { data, error } = await db
         .from("certificado_conceptos")
-        .insert([concepto])
+        .insert([{ company_id: companyId, ...concepto }])
         .select()
         .single();
       if (error) throw error;
@@ -396,52 +402,22 @@ export function useCertificados(obraId?: string) {
         return `CERT-${String(count + 1).padStart(3, "0")}`;
       })();
 
-      const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-      const iva = incluir_iva ? Math.round(subtotal * 0.21 * 100) / 100 : 0;
-      const total = subtotal + iva;
-
-      const { data: cert, error } = await supabase
-        .from("certificados")
-        .insert([{
+      const { data, error } = await db.schema("api").rpc("save_certificate", {
+        p_certificate: {
           obra_id: obraId,
           numero,
           periodo,
-          subtotal,
-          iva,
-          total,
           observaciones: observaciones || null,
           tipo,
           anticipo_porcentaje,
           incluir_iva,
           ...(fecha_certificado ? { fecha_certificado } : {}),
-        }])
-        .select()
-        .single();
+        },
+        p_items: items,
+        p_id: null,
+      });
       if (error) throw error;
-
-      // Insert items
-      const itemsToInsert = items
-        .map((i) => ({
-          certificado_id: cert.id,
-          concepto_id: i.concepto_id,
-          descripcion: i.descripcion,
-          unidad: i.unidad,
-          cantidad: i.cantidad,
-          precio_unitario: i.precio_unitario,
-          subtotal: i.subtotal,
-          etapa: i.etapa || null,
-          seccion: i.seccion || null,
-          observaciones: i.observaciones || null,
-        }));
-
-      if (itemsToInsert.length > 0) {
-        const { error: itemsError } = await supabase
-          .from("certificado_items")
-          .insert(itemsToInsert);
-        if (itemsError) throw itemsError;
-      }
-
-      return cert;
+      return data;
     },
     onSuccess: () => {
       toast.success("Certificado creado");
@@ -501,52 +477,22 @@ export function useCertificados(obraId?: string) {
       incluir_iva?: boolean;
       fecha_certificado?: string;
     }) => {
-      const shouldIncludeIva = incluir_iva !== false;
-      const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-      const iva = shouldIncludeIva ? Math.round(subtotal * 0.21 * 100) / 100 : 0;
-      const total = subtotal + iva;
-
-      const updateData: Record<string, unknown> = { periodo, subtotal, iva, total, observaciones: observaciones || null };
-      if (tipo !== undefined) updateData.tipo = tipo;
-      if (anticipo_porcentaje !== undefined) updateData.anticipo_porcentaje = anticipo_porcentaje;
-      if (numero !== undefined && numero.trim() !== "") updateData.numero = numero.trim();
-      if (incluir_iva !== undefined) updateData.incluir_iva = incluir_iva;
-      if (fecha_certificado !== undefined && fecha_certificado !== "") updateData.fecha_certificado = fecha_certificado;
-
-      // Update certificado header
-      const { error } = await supabase
-        .from("certificados")
-        .update(updateData)
-        .eq("id", id);
+      if (!obraId) throw new Error("No obra selected");
+      const { error } = await db.schema("api").rpc("save_certificate", {
+        p_certificate: {
+          obra_id: obraId,
+          periodo,
+          observaciones: observaciones || null,
+          tipo,
+          anticipo_porcentaje,
+          numero,
+          incluir_iva,
+          fecha_certificado,
+        },
+        p_items: items,
+        p_id: id,
+      });
       if (error) throw error;
-
-      // Delete existing items and re-insert
-      const { error: delError } = await supabase
-        .from("certificado_items")
-        .delete()
-        .eq("certificado_id", id);
-      if (delError) throw delError;
-
-      const itemsToInsert = items
-        .map((i) => ({
-          certificado_id: id,
-          concepto_id: i.concepto_id,
-          descripcion: i.descripcion,
-          unidad: i.unidad,
-          cantidad: i.cantidad,
-          precio_unitario: i.precio_unitario,
-          subtotal: i.subtotal,
-          etapa: i.etapa || null,
-          seccion: i.seccion || null,
-          observaciones: i.observaciones || null,
-        }));
-
-      if (itemsToInsert.length > 0) {
-        const { error: itemsError } = await supabase
-          .from("certificado_items")
-          .insert(itemsToInsert);
-        if (itemsError) throw itemsError;
-      }
     },
     onSuccess: (_, vars) => {
       toast.success("Certificado actualizado");
@@ -617,7 +563,7 @@ export function useCertificados(obraId?: string) {
       if (error) throw error;
       return data as CertificadoPago[];
     },
-    enabled: !!obraId && certificados.length > 0,
+    enabled: !!obraId && !!companyId && certificados.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
@@ -640,24 +586,12 @@ export function useCertificados(obraId?: string) {
       gcTime: 30 * 60 * 1000,
     });
 
-  // ---- Helper: upload comprobante and return path ----
-  const uploadComprobante = async (file: File, certId: string): Promise<string> => {
-    const ext = file.name.split(".").pop() || "bin";
-    const path = `${obraId || "x"}/${certId}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage
-      .from("certificado-comprobantes")
-      .upload(path, file, { upsert: false, contentType: file.type });
-    if (error) throw error;
-    return path;
+  // Storage de comprobantes queda diferido: el flujo principal no depende de archivos.
+  const uploadComprobante = async (_file: File, _certId: string): Promise<string> => {
+    throw new Error("Los comprobantes adjuntos todavía no están habilitados en v2");
   };
 
-  const getComprobanteSignedUrl = async (path: string): Promise<string | null> => {
-    if (!path) return null;
-    const { data } = await supabase.storage
-      .from("certificado-comprobantes")
-      .createSignedUrl(path, 3600);
-    return data?.signedUrl ?? null;
-  };
+  const getComprobanteSignedUrl = async (_path: string): Promise<string | null> => null;
 
   // ---- Helper: auto-update certificado.estado based on pagos ----
   const syncCertificadoEstado = async (certificadoId: string) => {
@@ -720,9 +654,11 @@ export function useCertificados(obraId?: string) {
         comprobante_url = await uploadComprobante(pago.comprobante, pago.certificado_id);
       }
 
-      const { data, error } = await supabase
+      if (!companyId) throw new Error("No hay empresa activa");
+      const { data, error } = await db
         .from("certificado_pagos")
         .insert([{
+          company_id: companyId,
           certificado_id: pago.certificado_id,
           fecha: pago.fecha,
           monto: pago.monto,
@@ -804,8 +740,10 @@ export function useCertificados(obraId?: string) {
   const bulkInsertConceptos = useMutation({
     mutationFn: async (rows: ConceptoForm[]) => {
       if (!obraId) throw new Error("No obra selected");
+      if (!companyId) throw new Error("No hay empresa activa");
       const payload = rows.map((r, i) => ({
         ...r,
+        company_id: companyId,
         obra_id: obraId,
         orden: (r.orden ?? conceptos.length) + i,
       }));

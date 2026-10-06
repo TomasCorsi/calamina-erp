@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+const db = supabase as any;
 
 export interface ProveedorDB {
   id: string;
@@ -32,7 +35,7 @@ export interface ProveedorForm {
 }
 
 const fetchProveedores = async (): Promise<ProveedorDB[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("proveedores")
     .select("*")
     .order("nombre", { ascending: true });
@@ -43,21 +46,26 @@ const fetchProveedores = async (): Promise<ProveedorDB[]> => {
 
 export function useProveedores() {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   const {
     data: proveedores = [],
     isLoading: loading,
     refetch: fetchProveedoresRefetch,
   } = useQuery({
-    queryKey: ["proveedores"],
+    queryKey: ["proveedores", companyId],
     queryFn: fetchProveedores,
+    enabled: Boolean(companyId),
   });
 
   const createMutation = useMutation({
     mutationFn: async (prov: ProveedorForm) => {
-      const { data, error } = await supabase
+      if (!companyId) throw new Error("No hay empresa activa");
+      const { data, error } = await db
         .from("proveedores")
         .insert([{
+          company_id: companyId,
           nombre: prov.nombre,
           cuit: prov.cuit || null,
           direccion: prov.direccion || null,
@@ -97,7 +105,7 @@ export function useProveedores() {
         rubro: prov.rubro || null,
         observaciones: prov.observaciones || null,
       };
-      const { error } = await supabase
+      const { error } = await db
         .from("proveedores")
         .update(sanitized)
         .eq("id", id);
@@ -115,14 +123,14 @@ export function useProveedores() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("proveedores")
-        .delete()
+        .update({ activo: false })
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Proveedor eliminado correctamente");
+      toast.success("Proveedor desactivado correctamente");
       queryClient.invalidateQueries({ queryKey: ["proveedores"] });
     },
     onError: (error) => {
