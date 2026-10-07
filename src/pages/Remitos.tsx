@@ -86,7 +86,8 @@ export default function Remitos() {
   const canManage = hasPermission("remitos.manage");
   const canViewCreators = hasPermission("users.view");
   const { remitos, loading, batchSave, createRemito, fetchRemitos, loadAll, cargarHistorico, cargandoHistorico } = useRemitos();
-  const { itemsMap, invalidateItems } = useRemitoItemsMap();
+  const remitoIds = useMemo(() => remitos.map((remito) => remito.id), [remitos]);
+  const { itemsMap, invalidateItems } = useRemitoItemsMap(remitoIds);
   const { obras, maquinarias, clientes } = useRemitosCatalogs();
 
   const [searchTerm, setSearchTerm] = useUrlSearch("");

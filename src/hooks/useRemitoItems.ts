@@ -47,7 +47,7 @@ const PAGE_SIZE = 1000;
 export async function fetchRemitoItems(remitoId: string): Promise<RemitoItem[]> {
   const { data, error } = await supabase
     .from("remito_items")
-    .select("*")
+    .select("id,remito_id,orden,concepto,cantidad,unidad,precio_unitario,precio_total")
     .eq("remito_id", remitoId)
     .order("orden", { ascending: true });
   if (error) throw error;
@@ -73,7 +73,7 @@ async function fetchAllItems(): Promise<Record<string, RemitoItem[]>> {
   while (true) {
     const { data, error } = await supabase
       .from("remito_items")
-      .select("*")
+      .select("id,remito_id,orden,concepto,cantidad,unidad,precio_unitario,precio_total")
       .order("remito_id", { ascending: true })
       .order("orden", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
@@ -89,12 +89,33 @@ async function fetchAllItems(): Promise<Record<string, RemitoItem[]>> {
   return map;
 }
 
+async function fetchItemsForRemitos(remitoIds: string[]): Promise<Record<string, RemitoItem[]>> {
+  if (remitoIds.length === 0) return {};
+  const map: Record<string, RemitoItem[]> = {};
+  for (let index = 0; index < remitoIds.length; index += 150) {
+    const { data, error } = await supabase
+      .from("remito_items")
+      .select("id,remito_id,orden,concepto,cantidad,unidad,precio_unitario,precio_total")
+      .in("remito_id", remitoIds.slice(index, index + 150))
+      .order("remito_id", { ascending: true })
+      .order("orden", { ascending: true });
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const item = normalize(row);
+      (map[item.remito_id] ||= []).push(item);
+    }
+  }
+  return map;
+}
+
 /** Mapa remito_id -> ítems adicionales (jornadas de máquina, servicios, etc.) */
-export function useRemitoItemsMap() {
+export function useRemitoItemsMap(remitoIds?: string[]) {
   const queryClient = useQueryClient();
+  const scope = remitoIds ? remitoIds.join(",") : "all";
   const { data = {}, isLoading } = useQuery<Record<string, RemitoItem[]>>({
-    queryKey: ["remito_items"],
-    queryFn: fetchAllItems,
+    queryKey: ["remito_items", scope],
+    queryFn: () => remitoIds ? fetchItemsForRemitos(remitoIds) : fetchAllItems(),
+    enabled: remitoIds == null || remitoIds.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });

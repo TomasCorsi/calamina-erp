@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabaseV2 as supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface RemitosFilterOptions {
   tipos: string[];
@@ -25,7 +26,7 @@ const PAGE_SIZE = 1000;
  * Trae los valores posibles de los filtros desde la base completa
  * (no solo desde los remitos cargados en pantalla).
  */
-const fetchOptions = async (filterByUserId: string | null): Promise<RemitosFilterOptions> => {
+const fetchOptions = async (companyId: string, filterByUserId: string | null): Promise<RemitosFilterOptions> => {
   const tipos = new Set<string>();
   const proveedores = new Set<string>();
   const transportes = new Set<string>();
@@ -39,6 +40,7 @@ const fetchOptions = async (filterByUserId: string | null): Promise<RemitosFilte
     let query = supabase
       .from("remitos")
       .select("tipo_material, proveedor, tipo_transporte, desde, hasta, created_by")
+      .eq("company_id", companyId)
       .range(from, from + PAGE_SIZE - 1);
 
     if (filterByUserId) query = query.eq("created_by", filterByUserId);
@@ -73,10 +75,12 @@ const fetchOptions = async (filterByUserId: string | null): Promise<RemitosFilte
 };
 
 export function useRemitosFilterOptions(filterByUserId: string | null, enabled = true) {
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
   const { data = EMPTY, isLoading } = useQuery<RemitosFilterOptions>({
-    queryKey: ["remitos-filter-options", filterByUserId],
-    queryFn: () => fetchOptions(filterByUserId),
-    enabled,
+    queryKey: ["remitos-filter-options", companyId, filterByUserId],
+    queryFn: () => fetchOptions(companyId!, filterByUserId),
+    enabled: Boolean(enabled && companyId),
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnMount: false,

@@ -46,15 +46,15 @@ export interface RegistroHHForm {
   observaciones?: string;
 }
 
-const fetchRegistrosFromDB = async (): Promise<RegistroHHWithRelations[]> => {
+const fetchRegistrosFromDB = async (companyId: string, fecha: string): Promise<RegistroHHWithRelations[]> => {
   const { data, error } = await db
     .from("registros_hh")
     .select(`
-      *,
+      id,fecha,persona_id,obra_id,capataz_id,hora_entrada,hora_salida,horas_normales,horas_extra,horas_totales,tarea,estado,observaciones,created_at,updated_at,
       persona:personal!registros_hh_persona_id_fkey(first_name, last_name),
       obra:obras(nombre),
       capataz:personal!registros_hh_capataz_id_fkey(first_name, last_name)
-    `)
+    `).eq("company_id", companyId).eq("fecha", fecha)
     .order("fecha", { ascending: false });
 
   if (error) throw error;
@@ -65,7 +65,7 @@ const fetchRegistrosFromDB = async (): Promise<RegistroHHWithRelations[]> => {
   }));
 };
 
-export function usePresentismo() {
+export function usePresentismo(fecha: string) {
   const queryClient = useQueryClient();
   const { membership } = useAuth();
   const companyId = membership?.company_id;
@@ -75,9 +75,9 @@ export function usePresentismo() {
     isLoading: loading,
     refetch: fetchRegistros 
   } = useQuery({
-    queryKey: ['presentismo'],
-    queryFn: fetchRegistrosFromDB,
-    enabled: Boolean(companyId),
+    queryKey: ['presentismo', companyId, fecha],
+    queryFn: () => fetchRegistrosFromDB(companyId!, fecha),
+    enabled: Boolean(companyId && fecha),
   });
 
   const createMutation = useMutation({
@@ -94,7 +94,7 @@ export function usePresentismo() {
     },
     onSuccess: () => {
       toast.success("Registro creado correctamente");
-      queryClient.invalidateQueries({ queryKey: ['presentismo'] });
+      queryClient.invalidateQueries({ queryKey: ['presentismo', companyId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error) => {
@@ -114,7 +114,7 @@ export function usePresentismo() {
     },
     onSuccess: () => {
       toast.success("Registro actualizado correctamente");
-      queryClient.invalidateQueries({ queryKey: ['presentismo'] });
+      queryClient.invalidateQueries({ queryKey: ['presentismo', companyId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error) => {
@@ -134,7 +134,7 @@ export function usePresentismo() {
     },
     onSuccess: () => {
       toast.success("Registro eliminado correctamente");
-      queryClient.invalidateQueries({ queryKey: ['presentismo'] });
+      queryClient.invalidateQueries({ queryKey: ['presentismo', companyId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error) => {

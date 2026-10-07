@@ -5,13 +5,13 @@ import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 export type MaquinariaObraOption = { id: string; nombre: string };
 export type MaquinariaOperadorOption = { id: string; nombre: string; apellido: string };
 
-export function useMaquinariasCatalogs() {
+export function useMaquinariasCatalogs(enabled = true) {
   const { membership, hasPermission } = useAuth();
   const companyId = membership?.company_id;
 
   const query = useQuery({
     queryKey: ["maquinarias-catalogs-v2", companyId],
-    enabled: Boolean(companyId && hasPermission("maquinarias.view")),
+    enabled: Boolean(enabled && companyId && hasPermission("maquinarias.view")),
     queryFn: async () => {
       const [obrasResult, operadoresResult] = await Promise.all([
         supabase

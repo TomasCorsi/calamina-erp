@@ -44,7 +44,7 @@ const fetchProveedores = async (): Promise<ProveedorDB[]> => {
   return data || [];
 };
 
-export function useProveedores() {
+export function useProveedores(enabled = true) {
   const queryClient = useQueryClient();
   const { membership } = useAuth();
   const companyId = membership?.company_id;
@@ -56,7 +56,7 @@ export function useProveedores() {
   } = useQuery({
     queryKey: ["proveedores", companyId],
     queryFn: fetchProveedores,
-    enabled: Boolean(companyId),
+    enabled: Boolean(enabled && companyId),
   });
 
   const createMutation = useMutation({

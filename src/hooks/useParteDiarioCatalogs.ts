@@ -6,10 +6,10 @@ export type ParteObraOption = { id: string; nombre: string; estado: string };
 export type ParteMaquinariaOption = { id: string; codigo: string | null; tipo: string; patente: string | null };
 export type PartePersonalOption = { id: string; nombre: string; apellido: string; legajo: string; rol: string | null };
 
-export function useParteDiarioCatalogs() {
+export function useParteDiarioCatalogs(requested = true) {
   const { membership, hasPermission } = useAuth();
   const companyId = membership?.company_id;
-  const enabled = Boolean(companyId && hasPermission("parte_diario.view"));
+  const enabled = Boolean(requested && companyId && hasPermission("parte_diario.view"));
 
   const obrasQuery = useQuery({
     queryKey: ["parte-diario-obras-v2", companyId], enabled,

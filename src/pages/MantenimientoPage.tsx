@@ -50,7 +50,6 @@ import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 import { FilterBar, FilterState } from "@/components/shared/FilterBar";
 import { useMantenimientos, MantenimientoWithRelations, EstadoMantenimiento } from "@/hooks/useMantenimientos";
 import { useMaquinarias } from "@/hooks/useMaquinarias";
-import { useObras } from "@/hooks/useObras";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn, formatDate } from "@/lib/utils";
 import { ESTADO_CONFIG, TIPO_CONFIG, formatCurrency } from "@/components/mantenimiento/mantenimientoConstants";
@@ -60,7 +59,6 @@ import { HistoricoBanner } from "@/components/shared/HistoricoBanner";
 export default function MantenimientoPage() {
   const { mantenimientos, loading, updateMantenimiento, deleteMantenimiento, loadAll, cargarHistorico } = useMantenimientos();
   const { maquinarias } = useMaquinarias();
-  const { obras } = useObras();
   const serviceAlerts: Array<{
     maquinaria: string;
     maquinariaId: string;
@@ -290,7 +288,7 @@ export default function MantenimientoPage() {
         label="mantenimientos"
       />
       <div className="mb-4">
-        <FilterBar obras={obras} onFilterChange={setFilters} showObraFilter={false} />
+        <FilterBar obras={[]} onFilterChange={setFilters} showObraFilter={false} />
       </div>
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">

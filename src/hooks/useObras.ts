@@ -61,60 +61,26 @@ type ObrasQueryData = {
   clientes: ObraCliente[];
 };
 
+type UseObrasOptions = {
+  enabled?: boolean;
+  loadCatalogs?: boolean;
+};
+
 function optionalText(value?: string) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }
 
 async function fetchObrasFromV2(companyId: string): Promise<ObrasQueryData> {
-  const [obrasResult, personalResult, clientesResult] = await Promise.all([
-    supabase
-      .from("obras")
-      .select("id, nombre, numero, ubicacion, descripcion, estado, fecha_inicio, fecha_fin_estimada, responsable_id, cliente_id, created_at, updated_at")
-      .eq("company_id", companyId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("personal")
-      .select("id, first_name, last_name, status")
-      .eq("company_id", companyId)
-      .order("last_name"),
-    supabase
-      .from("clientes")
-      .select("id, nombre, cuit, direccion, localidad, telefono, email, activo")
-      .eq("company_id", companyId)
-      .order("nombre"),
-  ]);
-
+  const obrasResult = await supabase
+    .from("obras")
+    .select("id, nombre, numero, ubicacion, descripcion, estado, fecha_inicio, fecha_fin_estimada, responsable_id, cliente_id, created_at, updated_at, responsable:personal!obras_responsable_company_fkey(first_name,last_name), cliente:clientes!obras_cliente_company_fkey(id,nombre,cuit,direccion,localidad,telefono,email)")
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: false });
   if (obrasResult.error) throw obrasResult.error;
-  if (personalResult.error) throw personalResult.error;
-  if (clientesResult.error) throw clientesResult.error;
-
-  const personal = (personalResult.data ?? []).map((row) => ({
-    id: String(row.id),
-    nombre: String(row.first_name),
-    apellido: String(row.last_name),
-    activo: row.status === "active",
-  }));
-  const clientes = (clientesResult.data ?? []).map((row) => ({
-    id: String(row.id),
-    nombre: String(row.nombre),
-    cuit: row.cuit == null ? null : String(row.cuit),
-    direccion: row.direccion == null ? null : String(row.direccion),
-    localidad: row.localidad == null ? null : String(row.localidad),
-    telefono: row.telefono == null ? null : String(row.telefono),
-    email: row.email == null ? null : String(row.email),
-    activo: Boolean(row.activo),
-  }));
-  const personalById = new Map(personal.map((row) => [row.id, row]));
-  const clientesById = new Map(clientes.map((row) => [row.id, row]));
-
   const obras = (obrasResult.data ?? []).map((row) => {
-    const responsable = row.responsable_id == null
-      ? null
-      : personalById.get(String(row.responsable_id));
-    const cliente = row.cliente_id == null
-      ? null
-      : clientesById.get(String(row.cliente_id));
+    const responsable = Array.isArray(row.responsable) ? row.responsable[0] : row.responsable;
+    const cliente = Array.isArray(row.cliente) ? row.cliente[0] : row.cliente;
 
     return {
       id: String(row.id),
@@ -129,7 +95,7 @@ async function fetchObrasFromV2(companyId: string): Promise<ObrasQueryData> {
       cliente_id: row.cliente_id == null ? null : String(row.cliente_id),
       created_at: String(row.created_at),
       updated_at: String(row.updated_at),
-      responsable: responsable ? { nombre: responsable.nombre, apellido: responsable.apellido } : null,
+      responsable: responsable ? { nombre: String(responsable.first_name), apellido: String(responsable.last_name) } : null,
       cliente: cliente ? {
         id: cliente.id,
         nombre: cliente.nombre,
@@ -142,10 +108,29 @@ async function fetchObrasFromV2(companyId: string): Promise<ObrasQueryData> {
     } satisfies ObraWithRelations;
   });
 
-  return { obras, personal, clientes };
+  return { obras, personal: [], clientes: [] };
 }
 
-export function useObras() {
+async function fetchObrasCatalogs(companyId: string): Promise<Pick<ObrasQueryData, "personal" | "clientes">> {
+  const [personalResult, clientesResult] = await Promise.all([
+    supabase.from("personal").select("id, first_name, last_name, status").eq("company_id", companyId).order("last_name"),
+    supabase.from("clientes").select("id, nombre, cuit, direccion, localidad, telefono, email, activo").eq("company_id", companyId).order("nombre"),
+  ]);
+  if (personalResult.error) throw personalResult.error;
+  if (clientesResult.error) throw clientesResult.error;
+  return {
+    personal: (personalResult.data ?? []).map((row) => ({
+      id: String(row.id), nombre: String(row.first_name), apellido: String(row.last_name), activo: row.status === "active",
+    })),
+    clientes: (clientesResult.data ?? []).map((row) => ({
+      id: String(row.id), nombre: String(row.nombre), cuit: row.cuit == null ? null : String(row.cuit),
+      direccion: row.direccion == null ? null : String(row.direccion), localidad: row.localidad == null ? null : String(row.localidad),
+      telefono: row.telefono == null ? null : String(row.telefono), email: row.email == null ? null : String(row.email), activo: Boolean(row.activo),
+    })),
+  };
+}
+
+export function useObras(options: UseObrasOptions = {}) {
   const queryClient = useQueryClient();
   const { membership } = useAuth();
   const companyId = membership?.company_id;
@@ -157,7 +142,17 @@ export function useObras() {
   } = useQuery({
     queryKey: ["obras", companyId],
     queryFn: () => fetchObrasFromV2(companyId!),
-    enabled: Boolean(companyId),
+    enabled: Boolean(companyId && (options.enabled ?? true)),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const catalogsQuery = useQuery({
+    queryKey: ["obras-catalogs", companyId],
+    queryFn: () => fetchObrasCatalogs(companyId!),
+    enabled: Boolean(companyId && (options.enabled ?? true) && options.loadCatalogs),
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
@@ -252,6 +247,8 @@ export function useObras() {
 
   return {
     ...data,
+    personal: catalogsQuery.data?.personal ?? [],
+    clientes: catalogsQuery.data?.clientes ?? [],
     loading,
     fetchObras,
     createObra: async (obra: ObraForm) => {

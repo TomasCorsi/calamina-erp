@@ -44,9 +44,11 @@ const tipoMovimientoLabels: Record<string, string> = {
 };
 
 export default function Stock() {
-  const { items, movimientos, loading, createItem, updateItem, deleteItem, createMovimiento } = useStock();
-  const { obras } = useObras();
-  const { personal } = useOperationalPersonal();
+  const [activeTab, setActiveTab] = useState("inventario");
+  const [isMovFormOpen, setIsMovFormOpen] = useState(false);
+  const { items, movimientos, loading, createItem, updateItem, deleteItem, createMovimiento } = useStock(activeTab === "movimientos");
+  const { obras } = useObras({ enabled: isMovFormOpen });
+  const { personal } = useOperationalPersonal(isMovFormOpen);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
@@ -54,7 +56,6 @@ export default function Stock() {
   
   // Dialog states
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isMovFormOpen, setIsMovFormOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StockItemDB | null>(null);
@@ -254,7 +255,7 @@ export default function Stock() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="inventario" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="inventario">Inventario</TabsTrigger>
             <TabsTrigger value="movimientos">Movimientos</TabsTrigger>

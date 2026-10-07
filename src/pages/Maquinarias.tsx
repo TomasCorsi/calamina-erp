@@ -95,11 +95,10 @@ export default function Maquinarias() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("maquinarias.manage");
   const { maquinarias, loading, createMaquinaria, updateMaquinaria, batchSave } = useMaquinarias();
-  const { obras, operadores } = useMaquinariasCatalogs();
-  
   const [searchTerm, setSearchTerm] = useUrlSearch("");
   const [estadoFilter, setEstadoFilter] = useState<string>("todos");
   const [formOpen, setFormOpen] = useState(false);
+  const { obras, operadores } = useMaquinariasCatalogs(formOpen);
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedMaquinaria, setSelectedMaquinaria] = useState<MaquinariaWithRelations | null>(null);

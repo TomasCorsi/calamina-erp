@@ -18,18 +18,23 @@ type ViewMode = "home" | "form" | "list";
 export default function ParteDiario() {
   const { roles, loading: loadingAuth } = useAuth();
   const isAdmin = roles.includes("admin");
+
+  if (loadingAuth) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  if (isAdmin) return <div className="min-h-screen bg-background"><TopNavbar /><main className="container mx-auto px-4 py-4"><ParteDiarioAdminView /></main></div>;
+
+  return <ParteDiarioOperator />;
+}
+
+function ParteDiarioOperator() {
   const { empleado, rolPersonal, loading: loadingEmpleado } = useEmpleadoProfile();
-  const { obras, maquinarias, personal } = useParteDiarioCatalogs();
   const {
     partes, borradorHoy, partesCompletadosHoy, saveDraft, completeParte, discardDraft,
     isSaving, isDeleting,
   } = useParteDiario();
   const [view, setView] = useState<ViewMode>("home");
   const [editingParte, setEditingParte] = useState<ParteDiarioType | null>(null);
-
-  if (loadingAuth) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-
-  if (isAdmin) return <div className="min-h-screen bg-background"><TopNavbar /><main className="container mx-auto px-4 py-4"><ParteDiarioAdminView /></main></div>;
+  const { obras, maquinarias, personal } = useParteDiarioCatalogs(view === "form");
 
   if (loadingEmpleado && !empleado) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 

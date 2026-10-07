@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -73,52 +73,50 @@ export interface MovimientoStockForm {
   observaciones?: string;
 }
 
-export function useStock() {
+export function useStock(loadMovimientos = false) {
   const { membership } = useAuth();
   const companyId = membership?.company_id;
-  const [items, setItems] = useState<StockItemDB[]>([]);
-  const [movimientos, setMovimientos] = useState<MovimientoWithRelations[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchItems = async () => {
-    setLoading(true);
-    if (!companyId) { setLoading(false); return; }
+  const itemsQuery = useQuery({
+    queryKey: ["stock-items-v2", companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => {
     const { data, error } = await db
       .from("stock_items")
-      .select("*")
+      .select("id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,stock_maximo,ubicacion,precio_unitario,activo,created_at,updated_at")
+      .eq("company_id", companyId)
       .order("nombre");
+      if (error) throw error;
+      return (data ?? []) as StockItemDB[];
+    },
+  });
 
-    if (error) {
-      console.error("Error fetching stock items:", error);
-      toast.error("Error al cargar inventario");
-    } else {
-      setItems(data || []);
-    }
-    setLoading(false);
-  };
-
-  const fetchMovimientos = async () => {
-    if (!companyId) return;
+  const movimientosQuery = useQuery({
+    queryKey: ["stock-movimientos-v2", companyId],
+    enabled: Boolean(companyId && loadMovimientos),
+    queryFn: async () => {
     const { data, error } = await db
       .from("movimientos_stock")
       .select(`
-        *,
+        id,fecha,item_id,tipo,cantidad,stock_anterior,stock_nuevo,obra_id,motivo,responsable_id,comprobante,observaciones,created_at,
         item:stock_items(nombre, codigo),
         obra:obras(nombre),
         responsable:personal!movimientos_stock_responsable_company_fkey(first_name, last_name)
       `)
+      .eq("company_id", companyId)
       .order("fecha", { ascending: false })
       .limit(100);
-
-    if (error) {
-      console.error("Error fetching movimientos:", error);
-    } else {
-      setMovimientos((data || []).map((row: any) => ({
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
         ...row,
         responsable: row.responsable ? { nombre: row.responsable.first_name, apellido: row.responsable.last_name } : null,
-      })));
-    }
-  };
+      })) as MovimientoWithRelations[];
+    },
+  });
+
+  const fetchItems = async () => { await itemsQuery.refetch(); };
+  const fetchMovimientos = async () => { await movimientosQuery.refetch(); };
 
   const createItem = async (item: StockItemForm) => {
     if (!companyId) return null;
@@ -135,7 +133,7 @@ export function useStock() {
     }
 
     toast.success("Ítem creado correctamente");
-    await fetchItems();
+    await queryClient.invalidateQueries({ queryKey: ["stock-items-v2", companyId] });
     return data;
   };
 
@@ -152,7 +150,7 @@ export function useStock() {
     }
 
     toast.success("Ítem actualizado correctamente");
-    await fetchItems();
+    await queryClient.invalidateQueries({ queryKey: ["stock-items-v2", companyId] });
     return true;
   };
 
@@ -169,7 +167,7 @@ export function useStock() {
     }
 
     toast.success("Ítem eliminado correctamente");
-    await fetchItems();
+    await queryClient.invalidateQueries({ queryKey: ["stock-items-v2", companyId] });
     return true;
   };
 
@@ -193,20 +191,17 @@ export function useStock() {
     }
 
     toast.success("Movimiento registrado correctamente");
-    await fetchItems();
-    await fetchMovimientos();
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["stock-items-v2", companyId] }),
+      queryClient.invalidateQueries({ queryKey: ["stock-movimientos-v2", companyId] }),
+    ]);
     return data;
   };
 
-  useEffect(() => {
-    fetchItems();
-    fetchMovimientos();
-  }, [companyId]);
-
   return {
-    items,
-    movimientos,
-    loading,
+    items: itemsQuery.data ?? [],
+    movimientos: movimientosQuery.data ?? [],
+    loading: itemsQuery.isLoading,
     fetchItems,
     fetchMovimientos,
     createItem,

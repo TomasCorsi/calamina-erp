@@ -34,7 +34,8 @@ const emptyForm: ProveedorForm = {
 };
 
 export default function Proveedores() {
-  const { proveedores, loading, createProveedor, updateProveedor, deleteProveedor } = useProveedores();
+  const [tab, setTab] = useUrlTab("proveedores");
+  const { proveedores, loading, createProveedor, updateProveedor, deleteProveedor } = useProveedores(tab === "proveedores");
 
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
@@ -112,9 +113,7 @@ export default function Proveedores() {
     }
   };
 
-  const [tab, setTab] = useUrlTab("proveedores");
-
-  if (loading) return <MainLayout title="Proveedores"><LoadingScreen /></MainLayout>;
+  if (loading && tab === "proveedores") return <MainLayout title="Proveedores"><LoadingScreen /></MainLayout>;
 
 
   return (

@@ -57,13 +57,13 @@ const estadoConfig: Record<EstadoObra, { label: string; className: string }> = {
 };
 
 export default function Obras() {
-  const { obras, personal, clientes, loading, createObra, updateObra, deleteObra } = useObras();
+  const [formOpen, setFormOpen] = useState(false);
+  const { obras, personal, clientes, loading, createObra, updateObra, deleteObra } = useObras({ loadCatalogs: formOpen });
   const { hasPermission } = useAuth();
   const canManage = hasPermission("obras.manage");
   
   const [searchTerm, setSearchTerm] = useState("");
   const [estadoFilter, setEstadoFilter] = useState<string>("todos");
-  const [formOpen, setFormOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [avanceOpen, setAvanceOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);

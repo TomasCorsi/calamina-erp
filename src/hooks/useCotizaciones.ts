@@ -38,8 +38,11 @@ export function useCotizaciones() {
     queryKey: ["cotizaciones-v2", companyId], enabled: Boolean(companyId),
     queryFn: async () => {
       const { data, error } = await db.from("cotizaciones").select(`
-        *, obra:obras!cotizaciones_obra_company_fkey(nombre), items:cotizacion_items(*),
-        categorias:cotizacion_categorias(*), anticipos:cotizacion_anticipos(*)
+        id,numero,obra_id,descripcion,estado,fecha_creacion,fecha_vencimiento,responsable,subtotal,iva,total,notas,moneda,anticipo_tipo,anticipo_valor,anticipo_monto,created_at,updated_at,
+        obra:obras!cotizaciones_obra_company_fkey(nombre),
+        items:cotizacion_items(id,cotizacion_id,categoria_id,numero,descripcion,unidad,cantidad,cantidad_m2,altura_promedio,cantidad_m3,precio_unitario,subtotal,total,created_at),
+        categorias:cotizacion_categorias(id,cotizacion_id,numero,nombre,orden,created_at),
+        anticipos:cotizacion_anticipos(id,cotizacion_id,descripcion,tipo,valor,monto,orden)
       `).eq("company_id", companyId).order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as CotizacionWithRelations[];

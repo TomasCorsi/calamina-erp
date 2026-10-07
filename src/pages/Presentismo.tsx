@@ -45,12 +45,12 @@ const estadoColors: Record<string, string> = {
 };
 
 export default function Presentismo() {
-  const { registros, loading, createRegistro, updateRegistro, deleteRegistro } = usePresentismo();
+  const [fechaFilter, setFechaFilter] = useState(new Date().toISOString().split("T")[0]);
+  const { registros, loading, createRegistro, updateRegistro, deleteRegistro } = usePresentismo(fechaFilter);
   const { obras } = useObras();
   const { personal } = useOperationalPersonal();
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [fechaFilter, setFechaFilter] = useState(new Date().toISOString().split("T")[0]);
   const [obraFilter, setObraFilter] = useState<string>("all");
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   

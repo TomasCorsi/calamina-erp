@@ -95,14 +95,14 @@ function mapMaquinaria(row: Record<string, unknown>): MaquinariaWithRelations {
   };
 }
 
-export function useMaquinarias() {
+export function useMaquinarias(enabled = true) {
   const queryClient = useQueryClient();
   const { membership, hasPermission } = useAuth();
   const companyId = membership?.company_id;
 
   const query = useQuery({
     queryKey: ["maquinarias-v2", companyId],
-    enabled: Boolean(companyId && hasPermission("maquinarias.view")),
+    enabled: Boolean(enabled && companyId && hasPermission("maquinarias.view")),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("maquinarias")

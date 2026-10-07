@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -270,7 +271,7 @@ export function useCertificados(obraId?: string) {
       if (!obraId) return [];
       const { data, error } = await supabase
         .from("certificados")
-        .select("*")
+        .select("*, pagos:certificado_pagos(*)")
         .eq("obra_id", obraId)
         .order("periodo", { ascending: false });
       if (error) throw error;
@@ -549,26 +550,14 @@ export function useCertificados(obraId?: string) {
   };
 
   // ---- Pagos per obra (all certificados) ----
-  const { data: allPagos = [], isLoading: loadingPagos } = useQuery({
-    queryKey: ["certificado_pagos", obraId],
-    queryFn: async () => {
-      if (!obraId) return [];
-      const certIds = certificados.map((c) => c.id);
-      if (certIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("certificado_pagos")
-        .select("*")
-        .in("certificado_id", certIds)
-        .order("fecha", { ascending: false });
-      if (error) throw error;
-      return data as CertificadoPago[];
-    },
-    enabled: !!obraId && !!companyId && certificados.length > 0,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
+  const allPagos = useMemo(
+    () => certificados.flatMap((certificado) => {
+      const pagos = (certificado as Certificado & { pagos?: CertificadoPago[] }).pagos ?? [];
+      return pagos;
+    }).sort((a, b) => b.fecha.localeCompare(a.fecha)),
+    [certificados],
+  );
+  const loadingPagos = loadingCertificados;
 
   const fetchPagos = (certificadoId: string): Promise<CertificadoPago[]> =>
     queryClient.fetchQuery({
