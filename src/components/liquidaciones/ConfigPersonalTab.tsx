@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -13,22 +13,41 @@ import {
 } from "@/components/ui/select";
 import { useConfigPersonal, useUpsertConfigPersonal, type LiquidacionModalidad } from "@/hooks/useLiquidaciones";
 import { Save, Search } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+
+type LiquidacionPersonal = {
+  id: string;
+  nombre: string;
+  apellido: string;
+  legajo: string | null;
+  dni: string | null;
+  banco: string | null;
+  numero_cuenta: string | null;
+};
 
 export function ConfigPersonalTab() {
+  const { membership, user } = useAuth();
   const upsert = useUpsertConfigPersonal();
   const { data: configs = [] } = useConfigPersonal();
   const [search, setSearch] = useState("");
 
   const { data: personal = [] } = useQuery({
-    queryKey: ["personal-activo"],
+    queryKey: ["liquidaciones-personal-activo", membership?.company_id, user?.id],
+    enabled: Boolean(membership?.company_id && user?.id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("personal")
-        .select("id, nombre, apellido, legajo, dni, banco, numero_cuenta, sueldo, sueldo_negro, modalidad_pago")
-        .eq("activo", true)
-        .order("apellido");
+      const { data, error } = await supabase.schema("api").rpc("list_rrhh_personal");
       if (error) throw error;
-      return data || [];
+      return ((data || []) as Array<Record<string, unknown>>)
+        .filter((row) => Boolean(row.activo))
+        .map((row) => ({
+          id: String(row.id),
+          nombre: String(row.nombre ?? ""),
+          apellido: String(row.apellido ?? ""),
+          legajo: row.legajo == null ? null : String(row.legajo),
+          dni: row.dni == null ? null : String(row.dni),
+          banco: row.banco == null ? null : String(row.banco),
+          numero_cuenta: row.numero_cuenta == null ? null : String(row.numero_cuenta),
+        })) satisfies LiquidacionPersonal[];
     },
   });
 
@@ -54,8 +73,8 @@ export function ConfigPersonalTab() {
     const payload = {
       personal_id: pid,
       modalidad: getField(pid, "modalidad", "mensual") as LiquidacionModalidad,
-      sueldo_blanco: Number(getField(pid, "sueldo_blanco", p.sueldo || 0)),
-      sueldo_negro: Number(getField(pid, "sueldo_negro", p.sueldo_negro || 0)),
+      sueldo_blanco: Number(getField(pid, "sueldo_blanco", 0)),
+      sueldo_negro: Number(getField(pid, "sueldo_negro", 0)),
       monto_banco_fijo: Number(getField(pid, "monto_banco_fijo", 0)),
       resto_efectivo: !!getField(pid, "resto_efectivo", true),
       presentismo_monto: Number(getField(pid, "presentismo_monto", 0)),
@@ -131,13 +150,13 @@ export function ConfigPersonalTab() {
                   </TableCell>
                   <TableCell>
                     <Input type="number" className="h-8 text-right text-xs"
-                      value={getField(p.id, "sueldo_blanco", p.sueldo || 0)}
+                      value={getField(p.id, "sueldo_blanco", 0)}
                       onChange={(e) => setField(p.id, "sueldo_blanco", e.target.value)}
                     />
                   </TableCell>
                   <TableCell>
                     <Input type="number" className="h-8 text-right text-xs"
-                      value={getField(p.id, "sueldo_negro", p.sueldo_negro || 0)}
+                      value={getField(p.id, "sueldo_negro", 0)}
                       onChange={(e) => setField(p.id, "sueldo_negro", e.target.value)}
                     />
                   </TableCell>

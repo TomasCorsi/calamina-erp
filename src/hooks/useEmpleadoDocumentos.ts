@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export type TipoDocumento = "estudio_medico" | "recibo_sueldo";
 
@@ -29,19 +30,25 @@ const BUCKET = "empleado-documentos";
 
 export function useEmpleadoDocumentos(filters?: { personalId?: string; tipo?: TipoDocumento }) {
   const qc = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   const list = useQuery({
-    queryKey: ["empleado_documentos", filters?.personalId ?? null, filters?.tipo ?? null],
+    queryKey: ["empleado_documentos", companyId, filters?.personalId ?? null, filters?.tipo ?? null],
+    enabled: Boolean(companyId),
     queryFn: async () => {
       let q = supabase
         .from("empleado_documentos")
-        .select("*, personal:personal_id(id,nombre,apellido,legajo)")
+        .select("*, personal:personal!empleado_documentos_personal_company_fkey(id,first_name,last_name,internal_code)")
         .order("created_at", { ascending: false });
       if (filters?.personalId) q = q.eq("personal_id", filters.personalId);
       if (filters?.tipo) q = q.eq("tipo", filters.tipo);
       const { data, error } = await q;
       if (error) throw error;
-      return (data || []) as unknown as EmpleadoDocumento[];
+      return ((data || []) as Array<any>).map((row) => ({
+        ...row,
+        personal: row.personal ? { id: row.personal.id, nombre: row.personal.first_name, apellido: row.personal.last_name, legajo: row.personal.internal_code } : null,
+      })) as EmpleadoDocumento[];
     },
   });
 
@@ -55,7 +62,8 @@ export function useEmpleadoDocumentos(filters?: { personalId?: string; tipo?: Ti
       file: File;
     }) => {
       const ext = payload.file.name.split(".").pop() || "bin";
-      const path = `${payload.personal_id}/${payload.tipo}/${crypto.randomUUID()}.${ext}`;
+      if (!companyId) throw new Error("No hay empresa activa");
+      const path = `${companyId}/${payload.personal_id}/${payload.tipo}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, payload.file, {
         contentType: payload.file.type,
         upsert: false,
@@ -65,6 +73,7 @@ export function useEmpleadoDocumentos(filters?: { personalId?: string; tipo?: Ti
       const { data: { user } } = await supabase.auth.getUser();
 
       const { error: insErr } = await supabase.from("empleado_documentos").insert({
+        company_id: companyId,
         personal_id: payload.personal_id,
         tipo: payload.tipo,
         titulo: payload.titulo,

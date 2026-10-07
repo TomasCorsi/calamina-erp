@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export type RolPersonal = "capataz" | "maquinista" | "chofer" | "administrativo" | "ayudante" | "sereno" | "mecanico" | "topografo" | "repartidor_calecita";
@@ -90,12 +90,21 @@ const normalizePersonalPayload = (payload: Record<string, unknown>): Record<stri
 
 const fetchPersonalFromDB = async (): Promise<PersonalDB[]> => {
   const { data, error } = await supabase
-    .from("personal")
-    .select("*")
-    .order("apellido");
+    .schema("api")
+    .rpc("list_rrhh_personal");
 
   if (error) throw error;
-  return data || [];
+  return ((data || []) as Array<Record<string, unknown>>).map((row) => ({
+    ...row,
+    nombre: row.nombre == null ? null : String(row.nombre),
+    apellido: row.apellido == null ? null : String(row.apellido),
+    rol: (row.rol || "administrativo") as RolPersonal,
+    email: row.email == null ? null : String(row.email),
+    activo: Boolean(row.activo),
+    sueldo: null,
+    sueldo_negro: null,
+    user_id: null,
+  })) as PersonalDB[];
 };
 
 export function usePersonal() {

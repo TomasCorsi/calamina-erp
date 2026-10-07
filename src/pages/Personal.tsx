@@ -16,6 +16,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { WORK_ROLES, WORK_ROLE_LABELS, type WorkRole } from "@/types/workRole";
+import { VacacionesTab } from "@/components/personal/VacacionesTab";
+import { EntregaEPPTab } from "@/components/personal/EntregaEPPTab";
+import { DocumentosEmpleadoTab } from "@/components/personal/DocumentosEmpleadoTab";
+import { LiquidacionesTab } from "@/components/personal/LiquidacionesTab";
+import { usePersonal } from "@/hooks/usePersonal";
 
 type Person = {
   id: string;
@@ -27,18 +32,40 @@ type Person = {
   work_role: WorkRole | null;
   status: "active" | "inactive";
   has_user: boolean;
+  dni: string | null;
+  telefono: string | null;
+  fecha_ingreso: string | null;
+  licencia: string | null;
+  vencimiento_licencia: string | null;
+  situacion_laboral: string | null;
 };
 
-type PersonalForm = { internal_code: string; first_name: string; last_name: string; work_email: string; job_title: string; work_role: WorkRole | "" };
-const emptyForm: PersonalForm = { internal_code: "", first_name: "", last_name: "", work_email: "", job_title: "", work_role: "" };
+type PersonalForm = {
+  internal_code: string; first_name: string; last_name: string; work_email: string;
+  job_title: string; work_role: WorkRole | ""; dni: string; telefono: string;
+  fecha_ingreso: string; licencia: string; vencimiento_licencia: string; situacion_laboral: string;
+};
+const emptyForm: PersonalForm = {
+  internal_code: "", first_name: "", last_name: "", work_email: "", job_title: "", work_role: "",
+  dni: "", telefono: "", fecha_ingreso: "", licencia: "", vencimiento_licencia: "", situacion_laboral: "",
+};
 
-function PendingTab({ name }: { name: string }) {
-  return <Alert className="max-w-3xl"><ShieldCheck className="h-4 w-4" /><AlertTitle>{name} conserva su lugar original</AlertTitle><AlertDescription>Su interfaz se habilitará nuevamente cuando el dominio tenga tablas, RLS y operaciones v2 verificadas. No se están ejecutando consultas al backend legacy.</AlertDescription></Alert>;
+function RestrictedTab({ name }: { name: string }) {
+  return <Alert className="max-w-3xl"><ShieldCheck className="h-4 w-4" /><AlertTitle>Acceso restringido a {name}</AlertTitle><AlertDescription>Tu usuario no tiene el permiso RRHH necesario para consultar esta sección.</AlertDescription></Alert>;
+}
+
+function PersonalLiquidacionesTab() {
+  const { personal } = usePersonal();
+  return <LiquidacionesTab personal={personal} />;
 }
 
 export default function Personal() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission("personal.manage");
+  const canViewRrhh = hasPermission("rrhh.view");
+  const canManageRrhh = hasPermission("rrhh.manage");
+  const canPayroll = hasPermission("rrhh.payroll");
+  const canDocuments = hasPermission("rrhh.documents");
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -50,11 +77,29 @@ export default function Personal() {
 
   const loadPeople = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.schema("api").rpc("list_personal");
+    const { data, error } = canViewRrhh
+      ? await supabase.schema("api").rpc("list_rrhh_personal")
+      : await supabase.schema("api").rpc("list_personal");
     if (error) toast.error("No se pudo cargar el personal");
-    else setPeople(Array.isArray(data) ? data as Person[] : []);
+    else setPeople(Array.isArray(data) ? (data as Array<Record<string, unknown>>).map((row) => ({
+      id: String(row.id),
+      internal_code: String(row.internal_code ?? row.legajo ?? ""),
+      first_name: String(row.first_name ?? row.nombre ?? ""),
+      last_name: String(row.last_name ?? row.apellido ?? ""),
+      work_email: (row.work_email ?? row.email ?? null) as string | null,
+      job_title: (row.job_title ?? null) as string | null,
+      work_role: (row.work_role ?? row.rol ?? null) as WorkRole | null,
+      status: (row.status ?? (row.activo ? "active" : "inactive")) as "active" | "inactive",
+      has_user: Boolean(row.has_user),
+      dni: (row.dni ?? null) as string | null,
+      telefono: (row.telefono ?? null) as string | null,
+      fecha_ingreso: (row.fecha_ingreso ?? null) as string | null,
+      licencia: (row.licencia ?? null) as string | null,
+      vencimiento_licencia: (row.vencimiento_licencia ?? null) as string | null,
+      situacion_laboral: (row.situacion_laboral ?? null) as string | null,
+    })) : []);
     setLoading(false);
-  }, []);
+  }, [canViewRrhh]);
 
   useEffect(() => { void loadPeople(); }, [loadPeople]);
 
@@ -70,7 +115,13 @@ export default function Personal() {
   const openCreate = () => { setEditing(null); setForm(emptyForm); setFormOpen(true); };
   const openEdit = (person: Person) => {
     setEditing(person);
-    setForm({ internal_code: person.internal_code, first_name: person.first_name, last_name: person.last_name, work_email: person.work_email ?? "", job_title: person.job_title ?? "", work_role: person.work_role ?? "" });
+    setForm({
+      internal_code: person.internal_code, first_name: person.first_name, last_name: person.last_name,
+      work_email: person.work_email ?? "", job_title: person.job_title ?? "", work_role: person.work_role ?? "",
+      dni: person.dni ?? "", telefono: person.telefono ?? "", fecha_ingreso: person.fecha_ingreso ?? "",
+      licencia: person.licencia ?? "", vencimiento_licencia: person.vencimiento_licencia ?? "",
+      situacion_laboral: person.situacion_laboral ?? "",
+    });
     setFormOpen(true);
   };
 
@@ -81,8 +132,27 @@ export default function Personal() {
     const result = editing
       ? await supabase.schema("api").rpc("update_personal", { p_personal_id: editing.id, ...common })
       : await supabase.schema("api").rpc("create_personal", common);
+    if (result.error) {
+      setSubmitting(false);
+      return toast.error("No se pudo guardar. Revisá código y email.");
+    }
+    const personalId = editing?.id ?? (result.data as string | null);
+    if (canManageRrhh && personalId) {
+      const { error: laborError } = await supabase.schema("api").rpc("update_personal_work_data", {
+        p_personal_id: personalId,
+        p_dni: form.dni.trim() || null,
+        p_telefono: form.telefono.trim() || null,
+        p_fecha_ingreso: form.fecha_ingreso || null,
+        p_licencia: form.licencia.trim() || null,
+        p_vencimiento_licencia: form.vencimiento_licencia || null,
+        p_situacion_laboral: form.situacion_laboral || null,
+      });
+      if (laborError) {
+        setSubmitting(false);
+        return toast.error("Los datos básicos se guardaron, pero no se pudieron actualizar los datos laborales.");
+      }
+    }
     setSubmitting(false);
-    if (result.error) return toast.error("No se pudo guardar. Revisá código y email.");
     setFormOpen(false);
     toast.success(editing ? "Personal actualizado" : "Personal creado");
     await loadPeople();
@@ -123,10 +193,10 @@ export default function Personal() {
           </Table>}
         </div>
       </TabsContent>
-      <TabsContent value="vacaciones"><PendingTab name="Vacaciones" /></TabsContent>
-      <TabsContent value="liquidaciones"><PendingTab name="Liquidaciones" /></TabsContent>
-      <TabsContent value="epp"><PendingTab name="Entrega de EPP" /></TabsContent>
-      <TabsContent value="documentos"><PendingTab name="Documentos" /></TabsContent>
+      <TabsContent value="vacaciones">{canViewRrhh ? <VacacionesTab /> : <RestrictedTab name="Vacaciones" />}</TabsContent>
+      <TabsContent value="liquidaciones">{canPayroll ? <PersonalLiquidacionesTab /> : <RestrictedTab name="Liquidaciones" />}</TabsContent>
+      <TabsContent value="epp">{canViewRrhh ? <EntregaEPPTab /> : <RestrictedTab name="Entrega de EPP" />}</TabsContent>
+      <TabsContent value="documentos">{canDocuments ? <DocumentosEmpleadoTab /> : <RestrictedTab name="Documentos" />}</TabsContent>
     </Tabs>
     <FormDialog open={formOpen} onOpenChange={setFormOpen} title={editing ? "Editar Personal" : "Nuevo Personal"} description="Datos básicos administrados por el backend v2" size="lg" onSubmit={() => void save()} submitLabel={submitting ? "Guardando..." : "Guardar"}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -136,6 +206,14 @@ export default function Personal() {
         <div className="space-y-2"><Label htmlFor="first-name">Nombre</Label><Input id="first-name" value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} /></div>
         <div className="space-y-2"><Label htmlFor="last-name">Apellido</Label><Input id="last-name" value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} /></div>
         <div className="space-y-2"><Label htmlFor="work-email">Email laboral</Label><Input id="work-email" type="email" value={form.work_email} onChange={(event) => setForm({ ...form, work_email: event.target.value })} /></div>
+        {canManageRrhh && <>
+          <div className="space-y-2"><Label htmlFor="dni">DNI</Label><Input id="dni" value={form.dni} onChange={(event) => setForm({ ...form, dni: event.target.value })} /></div>
+          <div className="space-y-2"><Label htmlFor="telefono">Teléfono</Label><Input id="telefono" value={form.telefono} onChange={(event) => setForm({ ...form, telefono: event.target.value })} /></div>
+          <div className="space-y-2"><Label htmlFor="fecha-ingreso">Fecha de ingreso</Label><Input id="fecha-ingreso" type="date" value={form.fecha_ingreso} onChange={(event) => setForm({ ...form, fecha_ingreso: event.target.value })} /></div>
+          <div className="space-y-2"><Label htmlFor="licencia">Licencia</Label><Input id="licencia" value={form.licencia} onChange={(event) => setForm({ ...form, licencia: event.target.value })} /></div>
+          <div className="space-y-2"><Label htmlFor="vencimiento-licencia">Vencimiento licencia</Label><Input id="vencimiento-licencia" type="date" value={form.vencimiento_licencia} onChange={(event) => setForm({ ...form, vencimiento_licencia: event.target.value })} /></div>
+          <div className="space-y-2"><Label>Situación laboral</Label><Select value={form.situacion_laboral || "none"} onValueChange={(value) => setForm({ ...form, situacion_laboral: value === "none" ? "" : value })}><SelectTrigger><SelectValue placeholder="Sin especificar" /></SelectTrigger><SelectContent><SelectItem value="none">Sin especificar</SelectItem><SelectItem value="registrado">Registrado</SelectItem><SelectItem value="monotributista">Monotributista</SelectItem><SelectItem value="contratado">Contratado</SelectItem><SelectItem value="eventual">Eventual</SelectItem></SelectContent></Select></div>
+        </>}
       </div>
     </FormDialog>
   </MainLayout>;

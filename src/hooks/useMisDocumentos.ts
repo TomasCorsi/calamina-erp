@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabaseV2 } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmpleadoProfile } from "@/hooks/useEmpleadoProfile";
 import { toast } from "sonner";
@@ -138,11 +138,7 @@ export function useMisDocumentos() {
 
   const markVisto = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("empleado_documentos")
-        .update({ visto_at: new Date().toISOString() })
-        .eq("id", id)
-        .is("visto_at", null);
+      const { error } = await supabaseV2.schema("api").rpc("mark_own_document_seen", { p_document_id: id });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mis_documentos"] }),
@@ -151,21 +147,10 @@ export function useMisDocumentos() {
 
   const firmar = useMutation({
     mutationFn: async (args: { id: string; firma_data_url: string }) => {
-      let ip: string | null = null;
-      try {
-        const r = await fetch("https://api.ipify.org?format=json");
-        const j = await r.json();
-        ip = j?.ip || null;
-      } catch { void 0; }
-      const { error } = await supabase
-        .from("empleado_documentos")
-        .update({
-          firma_data_url: args.firma_data_url,
-          firmado_at: new Date().toISOString(),
-          firmado_ip: ip,
-          visto_at: new Date().toISOString(),
-        })
-        .eq("id", args.id);
+      const { error } = await supabaseV2.schema("api").rpc("sign_own_receipt", {
+        p_document_id: args.id,
+        p_signature_data_url: args.firma_data_url,
+      });
       if (error) throw error;
     },
     onSuccess: () => {

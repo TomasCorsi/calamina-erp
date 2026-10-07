@@ -25,6 +25,7 @@ import { useEmpleadoDocumentos, type TipoDocumento, type EmpleadoDocumento } fro
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 
 const DOCS_BUCKET = "empleado-documentos";
 import { formatDate } from "@/lib/utils";
@@ -176,13 +177,6 @@ async function extractRar(file: File): Promise<File[]> {
   return out;
 }
 
-const fileToDataUrl = (f: File) =>
-  new Promise<string>((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result as string);
-    r.onerror = rej;
-    r.readAsDataURL(f);
-  });
 const getErrorMessage = (e: unknown, fallback: string) => e instanceof Error ? e.message : fallback;
 
 interface MatchRow {
@@ -197,6 +191,8 @@ interface MatchRow {
 
 export function DocumentosEmpleadoTab() {
   const { personal } = usePersonal();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
   const [filterTipo, setFilterTipo] = useState<"all" | TipoDocumento>("all");
   const [filterPersonal, setFilterPersonal] = useState<string>("");
   const [filterEstado, setFilterEstado] = useState<"all" | "pendiente" | "visto" | "firmado">("all");
@@ -265,7 +261,7 @@ export function DocumentosEmpleadoTab() {
   const [pagesPerDoc, setPagesPerDoc] = useState<number>(2);
   const [autoSplit, setAutoSplit] = useState<boolean>(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [analyzePhase, setAnalyzePhase] = useState<"extract" | "local" | "ia" | null>(null);
+  const [analyzePhase, setAnalyzePhase] = useState<"extract" | "local" | null>(null);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [items, setItems] = useState<MatchRow[]>([]);
 
@@ -549,7 +545,7 @@ export function DocumentosEmpleadoTab() {
         chunks,
         8,
         async (f) => {
-          // Imágenes: intentar match por nombre de archivo, sino IA.
+          // Las imágenes se vinculan por nombre; los casos ambiguos quedan para asignación manual.
           if (!f.type.includes("pdf")) {
             const byName = matchEmpleadoByFilename(f.name, personalIndex);
             if (byName.personal_id) return { needsAi: false, match: byName };
@@ -600,57 +596,6 @@ export function DocumentosEmpleadoTab() {
       });
       setItems([...collected]);
 
-      // ---------- FASE 2: IA solo para los que no matchearon ----------
-      const pendingIdx = collected
-        .map((r, i) => (!r.personal_id ? i : -1))
-        .filter((i) => i >= 0);
-
-      if (pendingIdx.length > 0) {
-        setAnalyzePhase("ia");
-        setAnalyzeProgress({ done: 0, total: pendingIdx.length });
-
-        const personalLite = personalActivo.map((p) => ({
-          id: p.id, nombre: p.nombre, apellido: p.apellido, dni: p.dni,
-        }));
-
-        const BATCH = 5;
-        const batches: number[][] = [];
-        for (let i = 0; i < pendingIdx.length; i += BATCH) {
-          batches.push(pendingIdx.slice(i, i + BATCH));
-        }
-
-        let aiDone = 0;
-        await runWithConcurrency(
-          batches,
-          3,
-          async (batchIdx) => {
-            const slice = batchIdx.map((i) => collected[i].file);
-            const payloadFiles = await Promise.all(
-              slice.map(async (f) => ({ name: f.name, mime: f.type, data: await fileToDataUrl(f) }))
-            );
-            const { data, error } = await supabase.functions.invoke("match-empleado-documentos", {
-              body: { files: payloadFiles, tipo: masTipo, personal: personalLite },
-            });
-            if (error) throw error;
-            const results = (data?.results || []) as any[];
-            results.forEach((r, k) => {
-              const targetIdx = batchIdx[k];
-              collected[targetIdx] = {
-                ...collected[targetIdx],
-                detected: r.detected ?? collected[targetIdx].detected,
-                personal_id: r.personal_id,
-                confidence: r.confidence,
-                error: r.error,
-                selected: !!r.personal_id,
-              };
-            });
-            aiDone += batchIdx.length;
-            setAnalyzeProgress({ done: aiDone, total: pendingIdx.length });
-            setItems([...collected]);
-          }
-        );
-      }
-
       const matched = collected.filter((r) => r.personal_id).length;
       const sinAsignar = collected.length - matched;
       if (sinAsignar > 0) {
@@ -699,8 +644,9 @@ export function DocumentosEmpleadoTab() {
 
     // Upload directo a Storage + insert, sin pasar por la mutation (evita spam de toasts y cuellos).
     const uploadDirect = async (pid: string, file: File) => {
+      if (!companyId) throw new Error("No hay empresa activa");
       const ext = file.name.split(".").pop() || "bin";
-      const path = `${pid}/${masTipo}/${crypto.randomUUID()}.${ext}`;
+      const path = `${companyId}/${pid}/${masTipo}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from(DOCS_BUCKET).upload(path, file, {
         contentType: file.type || "application/octet-stream",
         upsert: false,
@@ -708,6 +654,7 @@ export function DocumentosEmpleadoTab() {
       if (upErr) throw upErr;
       const { data: { user } } = await supabase.auth.getUser();
       const { error: insErr } = await supabase.from("empleado_documentos").insert({
+        company_id: companyId,
         personal_id: pid,
         tipo: masTipo,
         titulo,
@@ -1050,9 +997,7 @@ export function DocumentosEmpleadoTab() {
               {analyzing && analyzeProgress
                 ? analyzePhase === "extract"
                   ? `Extrayendo comprimidos ${analyzeProgress.done}/${analyzeProgress.total}...`
-                  : analyzePhase === "local"
-                    ? `Leyendo PDFs localmente ${analyzeProgress.done}/${analyzeProgress.total}...`
-                    : `Consultando IA ${analyzeProgress.done}/${analyzeProgress.total}...`
+                  : `Leyendo PDFs localmente ${analyzeProgress.done}/${analyzeProgress.total}...`
                 : "Analizar y detectar empleado"}
             </Button>
 

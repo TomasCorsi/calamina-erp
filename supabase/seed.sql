@@ -545,3 +545,60 @@ insert into public.certificado_items (
   '00000000-0000-4000-8018-000000000002',
   '00000000-0000-4000-8018-000000000001', 'Concepto certificable demo', 'un', 1, 15000, 15000
 ) on conflict (id) do update set cantidad = excluded.cantidad, subtotal = excluded.subtotal;
+
+-- RRHH: datos exclusivamente ficticios para validacion local.
+update public.personal
+set dni = case id
+    when '00000000-0000-4000-8001-000000000001' then '99000001'
+    when '00000000-0000-4000-8001-000000000002' then '99000002'
+    else '99000003' end,
+    telefono = '1100000000', fecha_ingreso = '2024-01-15',
+    situacion_laboral = 'registrado'
+where id in (
+  '00000000-0000-4000-8001-000000000001',
+  '00000000-0000-4000-8001-000000000002',
+  '00000000-0000-4000-8001-000000000003'
+);
+
+insert into public.vacaciones (
+  id, company_id, personal_id, fecha_inicio, fecha_fin, dias_totales,
+  motivo, estado, observaciones, approved_at
+) values (
+  '00000000-0000-4000-8019-000000000001',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8001-000000000001',
+  '2026-11-02', '2026-11-06', 5, 'vacaciones', 'aprobada',
+  'Solicitud ficticia para validacion local.', now()
+) on conflict (id) do update set observaciones = excluded.observaciones;
+
+insert into public.entregas_epp (
+  id, company_id, personal_id, fecha, estado, observaciones
+) values (
+  '00000000-0000-4000-8020-000000000001',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8001-000000000002',
+  '2026-10-01', 'entregado', 'Entrega ficticia para validacion local.'
+) on conflict (id) do update set observaciones = excluded.observaciones;
+
+insert into public.entrega_epp_items (
+  id, company_id, entrega_id, producto, tipo_modelo, marca, posee_certificacion, cantidad
+) values (
+  '00000000-0000-4000-8020-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8020-000000000001',
+  'Casco', 'Demo', 'Marca ficticia', true, 1
+) on conflict (id) do update set cantidad = excluded.cantidad;
+
+insert into public.liquidacion_config_personal (
+  id, company_id, personal_id, modalidad, sueldo_blanco, sueldo_negro,
+  monto_banco_fijo, resto_efectivo, banco, numero_cuenta
+) values (
+  '00000000-0000-4000-8021-000000000001',
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8001-000000000001',
+  'mensual', 100000, 0, 100000, false, 'Banco Demo', 'CUENTA-DEMO-001'
+) on conflict (company_id, personal_id) do update
+set modalidad=excluded.modalidad, sueldo_blanco=excluded.sueldo_blanco,
+    sueldo_negro=excluded.sueldo_negro, monto_banco_fijo=excluded.monto_banco_fijo,
+    resto_efectivo=excluded.resto_efectivo, banco=excluded.banco,
+    numero_cuenta=excluded.numero_cuenta;

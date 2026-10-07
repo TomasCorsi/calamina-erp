@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface EntregaEPP {
   id: string;
@@ -42,9 +43,11 @@ export const DEFAULT_EPP_ITEMS: EntregaEPPItemForm[] = [
 
 export function useEntregasEPP(personalId?: string) {
   const queryClient = useQueryClient();
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
 
   const { data: entregas = [], isLoading } = useQuery({
-    queryKey: ["entregas-epp", personalId],
+    queryKey: ["entregas-epp", companyId, personalId],
     queryFn: async () => {
       if (!personalId) return [];
       const { data, error } = await supabase
@@ -55,30 +58,18 @@ export function useEntregasEPP(personalId?: string) {
       if (error) throw error;
       return data as EntregaEPP[];
     },
-    enabled: !!personalId,
+    enabled: !!companyId && !!personalId,
   });
 
   const createEntrega = useMutation({
     mutationFn: async ({ personalId, fecha, items }: { personalId: string; fecha: string; items: EntregaEPPItemForm[] }) => {
-      const { data: entrega, error: entregaError } = await supabase
-        .from("entregas_epp")
-        .insert({ personal_id: personalId, fecha })
-        .select()
-        .single();
-      if (entregaError) throw entregaError;
-
-      const itemsToInsert = items
-        .filter((i) => i.producto.trim())
-        .map((i) => ({ ...i, entrega_id: entrega.id }));
-
-      if (itemsToInsert.length > 0) {
-        const { error: itemsError } = await supabase
-          .from("entrega_epp_items")
-          .insert(itemsToInsert);
-        if (itemsError) throw itemsError;
-      }
-
-      return entrega as EntregaEPP;
+      const { data: entregaId, error } = await supabase.schema("api").rpc("create_epp_delivery", {
+        p_personal_id: personalId,
+        p_fecha: fecha,
+        p_items: items.filter((item) => item.producto.trim()),
+      });
+      if (error) throw error;
+      return { id: String(entregaId), personal_id: personalId, fecha } as EntregaEPP;
     },
     onSuccess: () => {
       toast.success("Entrega de EPP registrada");

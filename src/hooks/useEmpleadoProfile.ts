@@ -12,14 +12,14 @@ export type EmpleadoProfile = {
   rol: WorkRole | null;
   activo: boolean;
   nombreCompleto: string;
-  dni: null;
-  telefono: null;
-  email: null;
-  fecha_ingreso: null;
-  licencia: null;
-  vencimiento_licencia: null;
-  banco: null;
-  numero_cuenta: null;
+  dni: string | null;
+  telefono: string | null;
+  email: string | null;
+  fecha_ingreso: string | null;
+  licencia: string | null;
+  vencimiento_licencia: string | null;
+  banco: string | null;
+  numero_cuenta: string | null;
 };
 
 export function useEmpleadoProfile() {
@@ -30,9 +30,7 @@ export function useEmpleadoProfile() {
     enabled: Boolean(membership?.company_id && personalId),
     retry: false,
     queryFn: async (): Promise<EmpleadoProfile | null> => {
-      const { data, error } = await supabase.from("personal")
-        .select("id, company_id, internal_code, first_name, last_name, work_role, status")
-        .eq("company_id", membership!.company_id).eq("id", personalId!).maybeSingle();
+      const { data, error } = await supabase.schema("api").rpc("current_employee_profile");
       if (error) throw error;
       if (!data) return null;
       const row = data as Record<string, unknown>;
@@ -42,8 +40,10 @@ export function useEmpleadoProfile() {
         id: String(row.id), company_id: String(row.company_id), nombre, apellido,
         legajo: String(row.internal_code ?? ""), rol: (row.work_role as WorkRole | null) ?? null,
         activo: row.status === "active", nombreCompleto: `${nombre} ${apellido}`.trim(),
-        dni: null, telefono: null, email: null, fecha_ingreso: null,
-        licencia: null, vencimiento_licencia: null, banco: null, numero_cuenta: null,
+        dni: row.dni == null ? null : String(row.dni), telefono: row.telefono == null ? null : String(row.telefono),
+        email: row.work_email == null ? null : String(row.work_email), fecha_ingreso: row.fecha_ingreso == null ? null : String(row.fecha_ingreso),
+        licencia: row.licencia == null ? null : String(row.licencia), vencimiento_licencia: row.vencimiento_licencia == null ? null : String(row.vencimiento_licencia),
+        banco: row.banco == null ? null : String(row.banco), numero_cuenta: row.numero_cuenta == null ? null : String(row.numero_cuenta),
       };
     },
   });

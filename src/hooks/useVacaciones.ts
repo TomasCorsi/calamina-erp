@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export type MotivoVacacion = "vacaciones" | "licencia_medica" | "permiso_personal" | "otro";
 
@@ -64,6 +65,8 @@ export const calcularDiasUsados = (vacaciones: VacacionDB[], personalId: string)
 
 
 export function useVacaciones() {
+  const { membership } = useAuth();
+  const companyId = membership?.company_id;
   const [vacaciones, setVacaciones] = useState<VacacionDB[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,10 +76,10 @@ export function useVacaciones() {
       .from("vacaciones")
       .select(`
         *,
-        personal:personal_id (
-          nombre,
-          apellido,
-          legajo
+        personal:personal!vacaciones_personal_company_fkey (
+          first_name,
+          last_name,
+          internal_code
         )
       `)
       .order("created_at", { ascending: false });
@@ -85,7 +88,10 @@ export function useVacaciones() {
       console.error("Error fetching vacaciones:", error);
       toast.error("Error al cargar vacaciones");
     } else {
-      setVacaciones((data as unknown as VacacionDB[]) || []);
+      setVacaciones(((data || []) as Array<any>).map((row) => ({
+        ...row,
+        personal: row.personal ? { nombre: row.personal.first_name, apellido: row.personal.last_name, legajo: row.personal.internal_code } : null,
+      })) as VacacionDB[]);
     }
     setLoading(false);
   };
@@ -93,7 +99,7 @@ export function useVacaciones() {
   const createVacacion = async (vacacion: VacacionForm) => {
     const { data, error } = await supabase
       .from("vacaciones")
-      .insert([vacacion])
+      .insert([{ ...vacacion, company_id: companyId, estado: "aprobada", approved_at: new Date().toISOString() }])
       .select()
       .single();
 
@@ -174,8 +180,8 @@ export function useVacaciones() {
   };
 
   useEffect(() => {
-    fetchVacaciones();
-  }, []);
+    if (companyId) fetchVacaciones();
+  }, [companyId]);
 
   return {
     vacaciones,

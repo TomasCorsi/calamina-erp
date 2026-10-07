@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export type LiquidacionPeriodo = "quincena_1" | "quincena_2" | "mes";
 export type LiquidacionEstado = "borrador" | "cerrada" | "pagada";
@@ -117,17 +118,22 @@ export const useLiquidacionItems = (liquidacionId: string | null) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("liquidacion_items")
-        .select("*, personal:personal_id(id, nombre, apellido, legajo, dni)")
+        .select("*, personal:personal!liquidacion_items_personal_company_fkey(id, first_name, last_name, internal_code, dni)")
         .eq("liquidacion_id", liquidacionId!);
       if (error) throw error;
-      return (data || []) as unknown as LiquidacionItem[];
+      return ((data || []) as Array<any>).map((row) => ({
+        ...row,
+        personal: row.personal ? { id: row.personal.id, nombre: row.personal.first_name, apellido: row.personal.last_name, legajo: row.personal.internal_code, dni: row.personal.dni } : null,
+      })) as LiquidacionItem[];
     },
   });
 };
 
 export const useConfigPersonal = () => {
+  const { membership, user, hasPermission } = useAuth();
   return useQuery({
-    queryKey: ["liquidacion_config_personal"],
+    queryKey: ["liquidacion_config_personal", membership?.company_id, user?.id],
+    enabled: Boolean(membership?.company_id && user?.id && hasPermission("rrhh.payroll")),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("liquidacion_config_personal")
@@ -140,11 +146,12 @@ export const useConfigPersonal = () => {
 
 export const useUpsertConfigPersonal = () => {
   const qc = useQueryClient();
+  const { membership } = useAuth();
   return useMutation({
     mutationFn: async (cfg: Partial<ConfigPersonal> & { personal_id: string }) => {
       const { data, error } = await supabase
         .from("liquidacion_config_personal")
-        .upsert(cfg, { onConflict: "personal_id" })
+        .upsert({ ...cfg, company_id: membership?.company_id }, { onConflict: "company_id,personal_id" })
         .select()
         .single();
       if (error) throw error;
@@ -162,54 +169,12 @@ export const useCreateLiquidacion = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { periodo: LiquidacionPeriodo; mes: number; anio: number }) => {
-      // Create header
-      const { data: liq, error } = await supabase
-        .from("liquidaciones")
-        .insert(input)
-        .select()
-        .single();
+      const { data: id, error } = await supabase.schema("api").rpc("create_payroll", {
+        p_periodo: input.periodo, p_mes: input.mes, p_anio: input.anio,
+      });
       if (error) throw error;
-
-      // Load configs for matching modalidad
-      const { data: configs, error: cfgErr } = await supabase
-        .from("liquidacion_config_personal")
-        .select("*, personal:personal_id(id, activo)");
-      if (cfgErr) throw cfgErr;
-
-      const wantsPeriod = (mod: LiquidacionModalidad) => {
-        if (input.periodo === "mes") return mod === "mensual" || mod === "ambas";
-        return mod === "quincenal" || mod === "ambas";
-      };
-
-      const items = (configs || [])
-        .filter((c: any) => c.personal?.activo !== false && wantsPeriod(c.modalidad))
-        .map((c: any) => {
-          // Quincena = half the configured monthly base
-          const factor = input.periodo === "mes" ? 1 : 0.5;
-          const bruto_blanco = Number(c.sueldo_blanco || 0) * factor;
-          const bruto_negro = Number(c.sueldo_negro || 0) * factor;
-          const presentismo =
-            (Number(c.presentismo_monto || 0) +
-              ((bruto_blanco + bruto_negro) * Number(c.presentismo_porcentaje || 0)) / 100) *
-            factor;
-          return {
-            liquidacion_id: liq.id,
-            personal_id: c.personal_id,
-            bruto_blanco,
-            bruto_negro,
-            presentismo,
-            embargo: c.embargo,
-            cbu_snapshot: c.cbu,
-            banco_snapshot: c.banco,
-            numero_cuenta_snapshot: c.numero_cuenta,
-          };
-        });
-
-      if (items.length > 0) {
-        const { error: itErr } = await supabase.from("liquidacion_items").insert(items);
-        if (itErr) throw itErr;
-      }
-
+      const { data: liq, error: loadError } = await supabase.from("liquidaciones").select("*").eq("id", String(id)).single();
+      if (loadError) throw loadError;
       return liq as Liquidacion;
     },
     onSuccess: () => {
@@ -283,19 +248,20 @@ export const useAdelantos = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("adelantos_personal")
-        .select("*, personal:personal_id(id, nombre, apellido, legajo)")
+        .select("*, personal:personal!adelantos_personal_company_fkey(id, first_name, last_name, internal_code)")
         .order("fecha", { ascending: false });
       if (error) throw error;
-      return (data || []) as any[];
+      return ((data || []) as any[]).map((row) => ({ ...row, personal: row.personal ? { id: row.personal.id, nombre: row.personal.first_name, apellido: row.personal.last_name, legajo: row.personal.internal_code } : null }));
     },
   });
 };
 
 export const useCreateAdelanto = () => {
   const qc = useQueryClient();
+  const { membership } = useAuth();
   return useMutation({
     mutationFn: async (input: { personal_id: string; fecha: string; monto: number; motivo?: string }) => {
-      const { error } = await supabase.from("adelantos_personal").insert(input);
+      const { error } = await supabase.from("adelantos_personal").insert({ ...input, company_id: membership?.company_id });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -338,10 +304,10 @@ export const usePrestamos = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("prestamos_personal")
-        .select("*, personal:personal_id(id, nombre, apellido, legajo), prestamo_cuotas(*)")
+        .select("*, personal:personal!prestamos_personal_company_fkey(id, first_name, last_name, internal_code), prestamo_cuotas(*)")
         .order("fecha", { ascending: false });
       if (error) throw error;
-      return (data || []) as any[];
+      return ((data || []) as any[]).map((row) => ({ ...row, personal: row.personal ? { id: row.personal.id, nombre: row.personal.first_name, apellido: row.personal.last_name, legajo: row.personal.internal_code } : null }));
     },
   });
 };
@@ -350,20 +316,11 @@ export const useCreatePrestamo = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { personal_id: string; fecha: string; monto_total: number; cantidad_cuotas: number; motivo?: string }) => {
-      const monto_cuota = +(input.monto_total / input.cantidad_cuotas).toFixed(2);
-      const { data: prestamo, error } = await supabase
-        .from("prestamos_personal")
-        .insert({ ...input, monto_cuota })
-        .select()
-        .single();
+      const { error } = await supabase.schema("api").rpc("create_personal_loan", {
+        p_personal_id: input.personal_id, p_fecha: input.fecha, p_monto_total: input.monto_total,
+        p_cantidad_cuotas: input.cantidad_cuotas, p_motivo: input.motivo || null,
+      });
       if (error) throw error;
-      const cuotas = Array.from({ length: input.cantidad_cuotas }).map((_, i) => ({
-        prestamo_id: prestamo.id,
-        numero_cuota: i + 1,
-        monto: monto_cuota,
-      }));
-      const { error: cErr } = await supabase.from("prestamo_cuotas").insert(cuotas);
-      if (cErr) throw cErr;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["prestamos_personal"] });

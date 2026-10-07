@@ -33,6 +33,9 @@ const Clientes = lazy(() => import("./pages/Clientes"));
 const Proveedores = lazy(() => import("./pages/Proveedores"));
 const Cotizaciones = lazy(() => import("./pages/Cotizaciones"));
 const Certificados = lazy(() => import("./pages/Certificados"));
+const Liquidaciones = lazy(() => import("./pages/Liquidaciones"));
+const MiPerfil = lazy(() => import("./pages/MiPerfil"));
+const MisDocumentos = lazy(() => import("./pages/MisDocumentos"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,13 +54,10 @@ const pendingModules = [
   ["/dashboard", "Tablero de Obras", "Centro de control por obra"],
   ["/tablero/tv", "Tablero TV", "Centro de control de obras"],
   ["/viajes", "Viajes", "Registro de viajes y transporte"],
-  ["/liquidaciones", "Liquidación de Sueldos", "Quincena, mes, adelantos y préstamos"],
   ["/rrhh", "RRHH", "Novedades, sueldos y preparación de pagos"],
   ["/mensajes", "Mensajes", "Avisos y comunicación interna"],
   ["/reportes", "Reportes", "Análisis financiero y consultas"],
   ["/contabilidad", "Contabilidad", "Ventas, compras, pagos, asientos, IVA y reportes"],
-  ["/mi-perfil", "Mi Perfil", "Información de la cuenta"],
-  ["/mis-documentos", "Mis Documentos", "Estudios médicos y recibos de sueldo"],
 ] as const;
 
 export default function App() {
@@ -94,6 +94,9 @@ export default function App() {
                   <Route path="/proveedores" element={<ProtectedRoute requiredPermissions={["proveedores.view", "compras.view"]}><Proveedores /></ProtectedRoute>} />
                   <Route path="/cotizaciones" element={<ProtectedRoute requiredPermissions={["cotizaciones.view"]}><Cotizaciones /></ProtectedRoute>} />
                   <Route path="/certificados" element={<ProtectedRoute requiredPermissions={["certificados.view"]}><Certificados /></ProtectedRoute>} />
+                  <Route path="/liquidaciones" element={<ProtectedRoute requiredPermissions={["rrhh.payroll"]}><Liquidaciones /></ProtectedRoute>} />
+                  <Route path="/mi-perfil" element={<ProtectedRoute><MiPerfil /></ProtectedRoute>} />
+                  <Route path="/mis-documentos" element={<ProtectedRoute><MisDocumentos /></ProtectedRoute>} />
                   <Route path="/configuracion" element={<ProtectedRoute requiredPermissions={["users.view", "users.invite", "users.manage_roles"]}><Configuracion /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<Navigate to="/configuracion" replace />} />
                   {pendingModules.map(([path, title, subtitle]) => (
