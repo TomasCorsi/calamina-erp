@@ -1,80 +1,65 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+import { supabaseV2 as supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
-type RolPersonal = Database["public"]["Enums"]["rol_personal"];
-
-export interface EmpleadoSinParte {
+export interface MessageRecipient {
   id: string;
   nombre: string | null;
   apellido: string | null;
   legajo: string | null;
-  rol: RolPersonal;
+  rol: string | null;
+  telefono: string | null;
+  vencimientoLicencia: string | null;
   tieneUsuario: boolean;
+  tieneParte: boolean;
 }
 
+export interface EmpleadoSinParte extends MessageRecipient {}
+
 interface UseEmpleadosSinParteResult {
+  destinatarios: MessageRecipient[];
   empleadosSinParte: EmpleadoSinParte[];
   totalActivos: number;
   isLoading: boolean;
   error: Error | null;
 }
 
-export function useEmpleadosSinParte(fecha: string, enabled: boolean = true): UseEmpleadosSinParteResult {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["empleados-sin-parte", fecha],
+export function useEmpleadosSinParte(fecha: string, enabled = true): UseEmpleadosSinParteResult {
+  const { membership } = useAuth();
+  const query = useQuery({
+    queryKey: ["message-recipients-v2", membership?.company_id, fecha],
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
-    enabled: enabled && !!fecha,
-    queryFn: async () => {
-      // Parallelize independent fetches
-      const [empleadosRes, partesRes] = await Promise.all([
-        supabase
-          .from("personal_selector" as any)
-          .select("id, nombre, apellido, legajo, rol, user_id")
-          .eq("activo", true)
-          .order("apellido") as unknown as Promise<{ data: { id: string; nombre: string | null; apellido: string | null; legajo: string | null; rol: RolPersonal; user_id: string | null }[] | null; error: any }>,
-        supabase
-          .from("partes_diarios")
-          .select("personal_id")
-          .eq("fecha", fecha),
-      ]);
-
-      if (empleadosRes.error) throw empleadosRes.error;
-      if (partesRes.error) throw partesRes.error;
-
-      const empleadosActivos = empleadosRes.data;
-      const partesDelDia = partesRes.data;
-
-      // Filter out roles that don't need to submit partes
-      const ROLES_EXCLUIDOS = ['administrativo', 'sereno', 'topografo'];
-      const empleadosRelevantes = (empleadosActivos || [])
-        .filter((emp) => !ROLES_EXCLUIDOS.includes(emp.rol));
-
-      const conParte = new Set(partesDelDia?.map((p) => p.personal_id) || []);
-
-      const sinParte: EmpleadoSinParte[] = empleadosRelevantes
-        .filter((emp) => !conParte.has(emp.id))
-        .map((emp) => ({
-          id: emp.id,
-          nombre: emp.nombre,
-          apellido: emp.apellido,
-          legajo: emp.legajo,
-          rol: emp.rol,
-          tieneUsuario: emp.user_id !== null,
-        }));
-
-      return {
-        empleadosSinParte: sinParte,
-        totalActivos: empleadosRelevantes.length,
-      };
+    enabled: enabled && Boolean(fecha && membership?.company_id),
+    queryFn: async (): Promise<MessageRecipient[]> => {
+      const { data, error } = await supabase.schema("api").rpc("list_message_recipients", {
+        p_fecha: fecha,
+      });
+      if (error) throw error;
+      return ((data || []) as Array<Record<string, unknown>>).map((row) => ({
+        id: String(row.id),
+        nombre: row.nombre == null ? null : String(row.nombre),
+        apellido: row.apellido == null ? null : String(row.apellido),
+        legajo: row.legajo == null ? null : String(row.legajo),
+        rol: row.rol == null ? null : String(row.rol),
+        telefono: row.telefono == null ? null : String(row.telefono),
+        vencimientoLicencia:
+          row.vencimiento_licencia == null ? null : String(row.vencimiento_licencia),
+        tieneUsuario: Boolean(row.tiene_usuario),
+        tieneParte: Boolean(row.tiene_parte),
+      }));
     },
   });
 
+  const destinatarios = query.data ?? [];
+  const rolesExcluidos = new Set(["administrativo", "sereno", "topografo"]);
+  const relevantes = destinatarios.filter((empleado) => !rolesExcluidos.has(empleado.rol ?? ""));
+
   return {
-    empleadosSinParte: data?.empleadosSinParte || [],
-    totalActivos: data?.totalActivos || 0,
-    isLoading,
-    error: error as Error | null,
+    destinatarios,
+    empleadosSinParte: relevantes.filter((empleado) => !empleado.tieneParte),
+    totalActivos: relevantes.length,
+    isLoading: query.isLoading,
+    error: query.error instanceof Error ? query.error : null,
   };
 }

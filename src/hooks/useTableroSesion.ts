@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import type { MetricaSerie } from "@/hooks/useTableroSeries";
+import { useAuth } from "@/hooks/useAuth";
+
+const db = supabase as any;
 
 export interface TableroSesion {
   id: string;
@@ -37,45 +40,61 @@ function normalizar(row: any): TableroSesion {
 
 /**
  * Sesión compartida del tablero: el control (PC o celular) escribe y la TV
- * escucha los cambios en vivo.
+ * sincroniza los cambios mediante polling local.
  */
 export function useTableroSesion(opciones?: { esTV?: boolean }) {
   const esTV = !!opciones?.esTV;
+  const { membership } = useAuth();
+  const companyId = membership?.company_id ?? null;
   const [sesion, setSesion] = useState<TableroSesion | null>(null);
   const [loading, setLoading] = useState(true);
-  const [conectado, setConectado] = useState(false);
+  const conectado = false;
   const idRef = useRef<string | null>(null);
 
   // Carga (o crea) la sesión
   useEffect(() => {
     let cancelado = false;
     (async () => {
-      const guardada = localStorage.getItem(LOCAL_KEY);
+      if (!companyId) {
+        setLoading(false);
+        return;
+      }
+      const guardada = localStorage.getItem(`${LOCAL_KEY}:${companyId}`);
       let row: any = null;
 
       if (guardada) {
-        const { data } = await supabase
+        const { data } = await db
           .from("tablero_sesiones")
           .select("*")
           .eq("id", guardada)
+          .eq("company_id", companyId)
           .maybeSingle();
         row = data;
       }
       if (!row) {
-        const { data } = await supabase
+        const { data } = await db
           .from("tablero_sesiones")
           .select("*")
+          .eq("company_id", companyId)
           .order("created_at", { ascending: true })
           .limit(1);
         row = data?.[0] || null;
       }
       if (!row) {
-        const { data } = await supabase
+        const { data, error } = await db
           .from("tablero_sesiones")
-          .insert({ nombre: "Tablero TV" })
+          .insert({ company_id: companyId, nombre: "Tablero TV" })
           .select("*")
           .maybeSingle();
         row = data;
+        if (error?.code === "23505") {
+          const retry = await db
+            .from("tablero_sesiones")
+            .select("*")
+            .eq("company_id", companyId)
+            .maybeSingle();
+          row = retry.data;
+        }
       }
       if (cancelado || !row) {
         if (!cancelado) setLoading(false);
@@ -83,7 +102,7 @@ export function useTableroSesion(opciones?: { esTV?: boolean }) {
       }
       idRef.current = row.id;
       try {
-        localStorage.setItem(LOCAL_KEY, row.id);
+        localStorage.setItem(`${LOCAL_KEY}:${companyId}`, row.id);
       } catch {
         /* ignore */
       }
@@ -93,22 +112,21 @@ export function useTableroSesion(opciones?: { esTV?: boolean }) {
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [companyId]);
 
-  // Suscripción en vivo
+  // Realtime está deshabilitado en el entorno local; el polling mantiene
+  // sincronizados el control y la pantalla TV sin abrir un canal adicional.
   useEffect(() => {
     if (!sesion?.id) return;
-    const channel = supabase
-      .channel(`tablero-sesion-${sesion.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "tablero_sesiones", filter: `id=eq.${sesion.id}` },
-        (payload) => setSesion(normalizar(payload.new))
-      )
-      .subscribe((status) => setConectado(status === "SUBSCRIBED"));
-
+    let active = true;
+    const sync = async () => {
+      const { data } = await db.from("tablero_sesiones").select("*").eq("id", sesion.id).maybeSingle();
+      if (active && data) setSesion(normalizar(data));
+    };
+    const timer = window.setInterval(() => void sync(), 5000);
     return () => {
-      supabase.removeChannel(channel);
+      active = false;
+      window.clearInterval(timer);
     };
   }, [sesion?.id]);
 
@@ -117,7 +135,7 @@ export function useTableroSesion(opciones?: { esTV?: boolean }) {
       const id = idRef.current;
       if (!id) return;
       setSesion((prev) => (prev ? { ...prev, ...cambios } as TableroSesion : prev));
-      await supabase.from("tablero_sesiones").update(cambios as any).eq("id", id);
+      await db.from("tablero_sesiones").update(cambios as any).eq("id", id);
     },
     []
   );
@@ -126,7 +144,7 @@ export function useTableroSesion(opciones?: { esTV?: boolean }) {
   useEffect(() => {
     if (!esTV || !sesion?.id) return;
     const ping = () =>
-      supabase
+      db
         .from("tablero_sesiones")
         .update({ tv_ping_at: new Date().toISOString() })
         .eq("id", sesion.id);

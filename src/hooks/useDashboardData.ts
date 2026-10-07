@@ -205,25 +205,34 @@ interface ReportesData {
 }
 
 const fetchReportesDataFromDB = async (): Promise<ReportesData> => {
-  const startOfCurrentWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const endOfCurrentWeek = endOfWeek(new Date(), { weekStartsOn: 1 });
-
-  const [obrasResult, maquinariasResult, viajesResult, mantenimientosResult] = await Promise.all([
-    supabase.from("obras").select("*"),
+  const [obrasResult, maquinariasResult, mantenimientosResult, combustibleResult, preciosResult] = await Promise.all([
+    supabase.from("obras").select("id,nombre,numero,estado,ubicacion,fecha_inicio,fecha_fin_estimada"),
     supabase.from("maquinarias").select("id, nombre, codigo, tipo, estado, obra_id"),
-    supabase
-      .from("viajes")
-      .select("*")
-      .gte("fecha", format(startOfCurrentWeek, "yyyy-MM-dd"))
-      .lte("fecha", format(endOfCurrentWeek, "yyyy-MM-dd")),
     supabase.from("mantenimientos").select("id, fecha, costo_total, maquinaria_id, maquinaria:maquinarias(obra_id)"),
+    supabase.from("cargas_combustible_repartidor").select("obra_id,fecha,litros,tipo_producto").eq("tipo_movimiento", "egreso"),
+    supabase.from("precios_productos_mes").select("anio,mes,producto,precio_unitario"),
   ]);
+
+  for (const result of [obrasResult, maquinariasResult, mantenimientosResult, combustibleResult, preciosResult]) {
+    if (result.error) throw result.error;
+  }
+
+  const precios = new Map<string, number>();
+  (preciosResult.data || []).forEach((precio: any) => {
+    precios.set(`${precio.anio}-${String(precio.mes).padStart(2, "0")}|${precio.producto}`, Number(precio.precio_unitario) || 0);
+  });
+  const combustible = (combustibleResult.data || []).map((carga: any) => ({
+    ...carga,
+    costo_total:
+      (Number(carga.litros) || 0) *
+      (precios.get(`${String(carga.fecha).slice(0, 7)}|${carga.tipo_producto || "combustible"}`) || 0),
+  }));
 
   return {
     obras: obrasResult.data || [],
     maquinarias: maquinariasResult.data || [],
-    viajes: viajesResult.data || [],
-    combustible: [],
+    viajes: [],
+    combustible,
     mantenimientos: mantenimientosResult.data || [],
   };
 };

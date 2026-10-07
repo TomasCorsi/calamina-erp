@@ -77,7 +77,7 @@ export default function Dashboard() {
         )}
       />
       <span className={conectado && estado.conectado ? "text-success" : "text-muted-foreground"}>
-        {conectado && estado.conectado ? "En vivo" : "Reconectando"}
+        {conectado && estado.conectado ? "En vivo" : "Actualización periódica"}
       </span>
     </span>
   );

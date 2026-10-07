@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FileText, MoreVertical, Palmtree, Plus, Search, ShieldCheck, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -60,6 +61,11 @@ function PersonalLiquidacionesTab() {
 }
 
 export default function Personal() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab") ?? "empleados";
+  const activeTab = new Set(["empleados", "vacaciones", "liquidaciones", "epp", "documentos"]).has(requestedTab)
+    ? requestedTab
+    : "empleados";
   const { hasPermission } = useAuth();
   const canManage = hasPermission("personal.manage");
   const canViewRrhh = hasPermission("rrhh.view");
@@ -167,7 +173,11 @@ export default function Personal() {
   };
 
   return <MainLayout title="Personal" subtitle="Gestión de empleados y roles">
-    <Tabs defaultValue="empleados" className="space-y-6">
+    <Tabs
+      value={activeTab}
+      onValueChange={(tab) => setSearchParams(tab === "empleados" ? {} : { tab })}
+      className="space-y-6"
+    >
       <TabsList className="bg-card border border-border">
         <TabsTrigger value="empleados" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="w-4 h-4 mr-2" />Empleados</TabsTrigger>
         <TabsTrigger value="vacaciones" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Palmtree className="w-4 h-4 mr-2" />Vacaciones</TabsTrigger>

@@ -20,6 +20,10 @@ export function canAccessModule(path: string, context: ModuleAccessContext): boo
   if (path === "/proveedores") return context.permissions.has("proveedores.view") || context.permissions.has("compras.view");
   if (path === "/cotizaciones") return context.permissions.has("cotizaciones.view");
   if (path === "/certificados") return context.permissions.has("certificados.view");
+  if (path === "/dashboard" || path === "/tablero/tv") return context.permissions.has("dashboard.view");
+  if (path === "/reportes") return context.permissions.has("reportes.view");
+  if (path === "/mensajes") return context.permissions.has("mensajes.view");
+  if (path === "/rrhh") return context.permissions.has("rrhh.view");
   if (path === "/configuracion" || path === "/usuarios") {
     return USER_MANAGEMENT_PERMISSIONS.some((permission) => context.permissions.has(permission));
   }

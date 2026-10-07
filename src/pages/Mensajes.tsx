@@ -11,7 +11,6 @@ import { CalendarIcon, MessageCircle, AlertTriangle, Clock, Send, ExternalLink, 
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { usePersonal } from "@/hooks/usePersonal";
 import { useEmpleadosSinParte } from "@/hooks/useEmpleadosSinParte";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -128,10 +127,9 @@ function EmpleadoTable({ empleados, plantilla, onPlantillaChange }: {
 }
 
 export default function Mensajes() {
-  const { personal } = usePersonal();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const fechaStr = format(selectedDate, "yyyy-MM-dd");
-  const { empleadosSinParte, isLoading: loadingPartes } = useEmpleadosSinParte(fechaStr);
+  const { destinatarios, empleadosSinParte, isLoading: loadingPartes } = useEmpleadosSinParte(fechaStr);
 
   const [plantillaPartes, setPlantillaPartes] = useState(
     "Hola {nombre}, te recordamos que no cargaste el parte diario del {fecha}. Por favor completalo a la brevedad."
@@ -164,16 +162,8 @@ export default function Mensajes() {
     return d.toISOString().split("T")[0];
   }, []);
 
-  // Map empleadosSinParte to rows with phone from personal
-  const personalMap = useMemo(() => {
-    const map = new Map<string, typeof personal[0]>();
-    personal.forEach((p) => map.set(p.id, p));
-    return map;
-  }, [personal]);
-
   const partesRows: EmpleadoRow[] = useMemo(() => {
     return empleadosSinParte.map((emp) => {
-      const p = personalMap.get(emp.id);
       const nombre = [emp.nombre, emp.apellido].filter(Boolean).join(" ");
       const msg = plantillaPartes
         .replace("{nombre}", nombre || "")
@@ -181,37 +171,37 @@ export default function Mensajes() {
       return {
         nombre,
         legajo: emp.legajo,
-        telefono: p?.telefono || null,
+        telefono: emp.telefono,
         mensaje: msg,
       };
     });
-  }, [empleadosSinParte, personalMap, plantillaPartes, fechaStr]);
+  }, [empleadosSinParte, plantillaPartes, fechaStr]);
 
   const licenciaVencidaRows: EmpleadoRow[] = useMemo(() => {
-    return personal
-      .filter((p) => p.activo && p.vencimiento_licencia && p.vencimiento_licencia < hoy)
+    return destinatarios
+      .filter((p) => p.vencimientoLicencia && p.vencimientoLicencia < hoy)
       .map((p) => {
         const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ");
         const msg = plantillaVencida.replace("{nombre}", nombre || "");
         return { nombre, legajo: p.legajo, telefono: p.telefono, mensaje: msg };
       });
-  }, [personal, hoy, plantillaVencida]);
+  }, [destinatarios, hoy, plantillaVencida]);
 
   const licenciaPorVencerRows: EmpleadoRow[] = useMemo(() => {
-    return personal
-      .filter((p) => p.activo && p.vencimiento_licencia && p.vencimiento_licencia >= hoy && p.vencimiento_licencia <= in20Days)
+    return destinatarios
+      .filter((p) => p.vencimientoLicencia && p.vencimientoLicencia >= hoy && p.vencimientoLicencia <= in20Days)
       .map((p) => {
         const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ");
         const msg = plantillaPorVencer
           .replace("{nombre}", nombre || "")
-          .replace("{fecha_vencimiento}", formatFecha(p.vencimiento_licencia!));
+          .replace("{fecha_vencimiento}", formatFecha(p.vencimientoLicencia!));
         return { nombre, legajo: p.legajo, telefono: p.telefono, mensaje: msg };
       });
-  }, [personal, hoy, in20Days, plantillaPorVencer]);
+  }, [destinatarios, hoy, in20Days, plantillaPorVencer]);
 
   const sinRegistroRows: EmpleadoRow[] = useMemo(() => {
-    return personal
-      .filter((p) => p.activo && !p.user_id)
+    return destinatarios
+      .filter((p) => !p.tieneUsuario)
       .map((p) => {
         const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ");
         const msg = plantillaSinRegistro
@@ -220,7 +210,7 @@ export default function Mensajes() {
           .replace(/\{link_app\}/g, APP_LINK);
         return { nombre, legajo: p.legajo, telefono: p.telefono, mensaje: msg };
       });
-  }, [personal, plantillaSinRegistro]);
+  }, [destinatarios, plantillaSinRegistro]);
 
   return (
     <MainLayout title="Mensajes">

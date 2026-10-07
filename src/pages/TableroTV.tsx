@@ -100,7 +100,7 @@ export default function TableroTV() {
                 conectado && estado.conectado ? "bg-success animate-pulse" : "bg-muted-foreground"
               )}
             />
-            {conectado && estado.conectado ? "En vivo" : "Reconectando"}
+            {conectado && estado.conectado ? "En vivo" : "Actualización periódica"}
           </span>
           <span className="text-sm">
             {format(ahora, "dd/MM/yyyy")} · {format(ahora, "HH:mm")}

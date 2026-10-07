@@ -2,7 +2,6 @@ import { TopNavbar } from "@/components/layout/TopNavbar";
 import { useEmpleadoProfile } from "@/hooks/useEmpleadoProfile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DetailRow, DetailSection } from "@/components/shared/DetailRow";
-import { PushNotificationsToggle } from "@/components/pwa/PushNotificationsToggle";
 import { Loader2, UserCircle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -118,7 +117,9 @@ export default function MiPerfil() {
                 <CardTitle className="text-base">Notificaciones</CardTitle>
               </CardHeader>
               <CardContent>
-                <PushNotificationsToggle />
+                <p className="text-sm text-muted-foreground">
+                  Las notificaciones push permanecen deshabilitadas hasta contar con una suscripción v2 segura.
+                </p>
               </CardContent>
             </Card>
           </>

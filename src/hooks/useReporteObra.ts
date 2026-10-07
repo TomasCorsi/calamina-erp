@@ -163,9 +163,10 @@ export function useReporteObra({ obraId, fechaDesde, fechaHasta }: ReporteObraPa
       }
 
       // Remitos: query A por obra_id; si es cantera, query B adicional por `desde ilike`.
-      const remitosByObraQuery = supabase.from("remitos").select("*").eq("obra_id", obraId);
+      const remitoColumns = "id,fecha,obra_id,maquinaria_id,material,tipo_material,cantidad,cantidad_viajes,unidad,precio_total,desde,hasta";
+      const remitosByObraQuery = supabase.from("remitos").select(remitoColumns).eq("obra_id", obraId);
       const remitosByDesdeQuery = canteraDesdePattern
-        ? supabase.from("remitos").select("*").ilike("desde", canteraDesdePattern)
+        ? supabase.from("remitos").select(remitoColumns).ilike("desde", canteraDesdePattern)
         : null;
 
       const [
@@ -182,13 +183,16 @@ export function useReporteObra({ obraId, fechaDesde, fechaHasta }: ReporteObraPa
         otrosAll,
         cotsAll,
       ] = await Promise.all([
-        fetchAll<any>(supabase.from("partes_diarios").select("*").eq("obra_id", obraId)),
-        fetchAll<any>(supabase.from("horas_maquina").select("*").eq("obra_id", obraId)),
-        fetchAll<any>(supabase.from("maquinarias").select("id, codigo, nombre, patente, tipo")),
-        fetchAll<any>(supabase.from("personal").select("id, nombre, apellido, rol, sueldo, sueldo_negro")),
+        fetchAll<any>(supabase.from("partes_diarios").select("personal_id,maquinaria_id,fecha,hora_entrada,hora_salida,horometro_inicio,horometro_fin,cantidad_viajes,ausencias,estado").eq("obra_id", obraId)),
         Promise.resolve([] as any[]),
-        fetchAll<any>(supabase.from("cargas_combustible_repartidor").select("*").eq("obra_id", obraId)),
-        fetchAll<any>(supabase.from("precios_productos_mes" as any).select("*")),
+        fetchAll<any>(supabase.from("maquinarias").select("id, codigo, nombre, patente, tipo")),
+        (supabase as any).schema("api").rpc("list_rrhh_personal").then(({ data, error }: any) => {
+          if (error) throw error;
+          return (data || []) as any[];
+        }),
+        Promise.resolve([] as any[]),
+        fetchAll<any>(supabase.from("cargas_combustible_repartidor").select("fecha,maquinaria_id,litros,tipo_producto").eq("obra_id", obraId).eq("tipo_movimiento", "egreso")),
+        fetchAll<any>(supabase.from("precios_productos_mes" as any).select("anio,mes,producto,precio_unitario")),
         fetchAll<any>(remitosByObraQuery),
         remitosByDesdeQuery ? fetchAll<any>(remitosByDesdeQuery) : Promise.resolve([] as any[]),
         fetchAll<any>(
@@ -197,7 +201,7 @@ export function useReporteObra({ obraId, fechaDesde, fechaHasta }: ReporteObraPa
             .select("*, proveedor:proveedores(nombre), items:orden_compra_items(descripcion)")
             .eq("obra_id", obraId)
         ),
-        fetchAll<any>(supabase.from("otros_gastos").select("*").eq("obra_id", obraId)),
+        fetchAll<any>(supabase.from("otros_gastos").select("fecha,categoria,sector,monto").eq("obra_id", obraId)),
         fetchAll<any>(
           supabase.from("cotizaciones").select("id, total, estado, fecha_creacion, obra_id").eq("obra_id", obraId)
         ),
@@ -267,13 +271,7 @@ export function useReporteObra({ obraId, fechaDesde, fechaHasta }: ReporteObraPa
         cur.ausencias += Array.isArray(p.ausencias) ? p.ausencias.length : 0;
         persMap.set(id, cur);
       });
-      // Estimate cost per person: (sueldo + sueldo_negro) / 22 * días
-      persMap.forEach((row, id) => {
-        const per = perMap.get(id);
-        const sueldoTotal = (Number(per?.sueldo) || 0) + (Number(per?.sueldo_negro) || 0);
-        const jornal = sueldoTotal > 0 ? sueldoTotal / 22 : 0;
-        row.costoEstimado = jornal * row.dias;
-      });
+      // Salary configuration is intentionally excluded from operational reports.
       const personal = Array.from(persMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
       // ---- Horas Máquina ----
