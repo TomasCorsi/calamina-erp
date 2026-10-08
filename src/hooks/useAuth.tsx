@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { supabaseV2 as supabase } from "@/integrations/supabase/client";
@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const accessIdentityRef = useRef<string | null>(null);
 
   const clearAccess = useCallback(() => {
     setProfile(null);
@@ -60,11 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadAccess = useCallback(async (nextSession: Session | null) => {
     setSession(nextSession);
     if (!nextSession?.user) {
+      accessIdentityRef.current = null;
       clearAccess();
       setLoading(false);
       return;
     }
 
+    accessIdentityRef.current = nextSession.user.id;
     setLoading(true);
     const { data: membershipData, error: membershipError } = await supabase
       .from("company_memberships")
@@ -105,8 +108,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     void supabase.auth.getSession().then(({ data }) => { if (active) void loadAccess(data.session); });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (active) window.setTimeout(() => void loadAccess(nextSession), 0);
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!active) return;
+
+      if (event === "TOKEN_REFRESHED") {
+        setSession(nextSession);
+        return;
+      }
+
+      // Supabase can emit SIGNED_IN when an existing session is recovered after
+      // visibility changes. The identity and access state are already loaded, so
+      // updating the session is enough and keeps ProtectedRoute mounted.
+      if (event === "SIGNED_IN" && nextSession?.user.id === accessIdentityRef.current) {
+        setSession(nextSession);
+        return;
+      }
+
+      window.setTimeout(() => {
+        if (active) void loadAccess(nextSession);
+      }, 0);
     });
     return () => { active = false; listener.subscription.unsubscribe(); };
   }, [loadAccess]);
