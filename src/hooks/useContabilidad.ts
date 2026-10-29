@@ -134,13 +134,14 @@ export interface ContabPago {
 
 export interface ContabAsiento {
   id: string;
-  numero: number;
+  numero: number | null;
   fecha: string;
   descripcion: string;
   origen: string | null;
   total_debe: number;
   total_haber: number;
   created_at: string;
+  status: "draft" | "posted" | "reversed";
 }
 
 export interface ContabAsientoLinea {
@@ -163,7 +164,7 @@ export const useContabEmpresa = () =>
   useQuery({
     queryKey: ["contab_empresa"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("contab_empresa").select("*").order("created_at").limit(1);
+      const { data, error } = await (supabase as any).from("contab_empresa").select("*").limit(1);
       if (error) throw error;
       return (data?.[0] ?? null) as ContabEmpresa | null;
     },
@@ -173,14 +174,8 @@ export const useSaveContabEmpresa = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (e: Partial<ContabEmpresa>) => {
-      const payload = { ...e };
-      if (payload.id) {
-        const { error } = await (supabase as any).from("contab_empresa").update(payload).eq("id", payload.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any).from("contab_empresa").insert(payload);
-        if (error) throw error;
-      }
+      const { error } = await (supabase as any).schema("api").rpc("save_accounting_company", { p_data: e });
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contab_empresa"] });
@@ -205,13 +200,8 @@ export const useSaveCuenta = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (c: Partial<ContabCuenta>) => {
-      if (c.id) {
-        const { error } = await (supabase as any).from("contab_plan_cuentas").update(c).eq("id", c.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any).from("contab_plan_cuentas").insert(c);
-        if (error) throw error;
-      }
+      const { error } = await (supabase as any).schema("api").rpc("save_accounting_account", { p_data: c });
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contab_plan_cuentas"] });
@@ -225,7 +215,7 @@ export const useDeleteCuenta = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("contab_plan_cuentas").delete().eq("id", id);
+      const { error } = await (supabase as any).schema("api").rpc("deactivate_accounting_account", { p_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -251,19 +241,9 @@ export const useSaveTercero = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (t: Partial<ContabTercero>) => {
-      const payload: any = { ...t };
-      ["cuit","domicilio","localidad","provincia","cp","telefono","email","cbu","banco","numero_cuenta","notas"].forEach((k) => {
-        if (payload[k] === "") payload[k] = null;
-      });
-      if (payload.id) {
-        const { error } = await (supabase as any).from("contab_terceros").update(payload).eq("id", payload.id);
-        if (error) throw error;
-        return payload.id as string;
-      } else {
-        const { data, error } = await (supabase as any).from("contab_terceros").insert(payload).select("id").single();
-        if (error) throw error;
-        return data.id as string;
-      }
+      const { data, error } = await (supabase as any).schema("api").rpc("save_accounting_party", { p_data: t });
+      if (error) throw error;
+      return data as string;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contab_terceros"] });
@@ -277,7 +257,7 @@ export const useDeleteTercero = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("contab_terceros").delete().eq("id", id);
+      const { error } = await (supabase as any).schema("api").rpc("deactivate_accounting_party", { p_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -295,7 +275,7 @@ export const useContabComprobantes = (filters?: { esVenta?: boolean; desde?: str
     queryFn: async () => {
       let q = (supabase as any)
         .from("contab_comprobantes")
-        .select("*, tercero:contab_terceros(razon_social,cuit), obra:obras(nombre), maquinaria:maquinarias(nombre,codigo)")
+        .select("*")
         .order("fecha", { ascending: false })
         .order("created_at", { ascending: false });
       if (filters?.esVenta !== undefined) q = q.eq("es_venta", filters.esVenta);
@@ -326,34 +306,9 @@ export const useSaveComprobante = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { cbte: Partial<ContabComprobante>; items: Partial<ContabCbteItem>[] }) => {
-      const { cbte, items } = params;
-      const payload: any = { ...cbte };
-      ["fecha_vto","tercero_id","obra_id","maquinaria_id","observaciones","empresa_id","letra"].forEach((k) => {
-        if (payload[k] === "") payload[k] = null;
-      });
-      let id = payload.id;
-      if (id) {
-        const { error } = await (supabase as any).from("contab_comprobantes").update(payload).eq("id", id);
-        if (error) throw error;
-        await (supabase as any).from("contab_comprobante_items").delete().eq("comprobante_id", id);
-      } else {
-        const { data: ud } = await supabase.auth.getUser();
-        payload.created_by = ud?.user?.id ?? null;
-        const { data, error } = await (supabase as any).from("contab_comprobantes").insert(payload).select("id").single();
-        if (error) throw error;
-        id = data.id;
-      }
-      if (items.length > 0) {
-        const rows = items.map((it, idx) => {
-          const r: any = { ...it, comprobante_id: id, orden: idx + 1 };
-          ["cuenta_id","obra_id","maquinaria_id"].forEach((k) => { if (r[k] === "") r[k] = null; });
-          delete r.id;
-          return r;
-        });
-        const { error } = await (supabase as any).from("contab_comprobante_items").insert(rows);
-        if (error) throw error;
-      }
-      return id as string;
+      const { data, error } = await (supabase as any).schema("api").rpc("save_accounting_document", { p_document: params.cbte, p_lines: params.items });
+      if (error) throw error;
+      return data as string;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contab_comprobantes"] });
@@ -368,7 +323,9 @@ export const useConfirmarComprobante = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cbteId: string) => {
-      const { data, error } = await (supabase as any).rpc("contab_generar_asiento_cbte", { _cbte_id: cbteId });
+      const { data: row, error: readError } = await (supabase as any).from("contab_comprobantes").select("es_venta").eq("id", cbteId).single();
+      if (readError) throw readError;
+      const { data, error } = await (supabase as any).schema("api").rpc("post_accounting_document", { p_document_id: cbteId, p_sale: row.es_venta });
       if (error) throw error;
       return data as string;
     },
@@ -385,10 +342,9 @@ export const useAnularComprobante = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cbteId: string) => {
-      const { error } = await (supabase as any)
-        .from("contab_comprobantes")
-        .update({ estado: "anulado", anulado_at: new Date().toISOString() })
-        .eq("id", cbteId);
+      const { data: row, error: readError } = await (supabase as any).from("contab_comprobantes").select("es_venta").eq("id", cbteId).single();
+      if (readError) throw readError;
+      const { error } = await (supabase as any).schema("api").rpc("reverse_accounting_document", { p_document_id: cbteId, p_sale: row.es_venta, p_reason: "Anulacion solicitada desde Contabilidad" });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -403,7 +359,9 @@ export const useDeleteComprobante = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cbteId: string) => {
-      const { error } = await (supabase as any).from("contab_comprobantes").delete().eq("id", cbteId);
+      const { data: row, error: readError } = await (supabase as any).from("contab_comprobantes").select("es_venta").eq("id", cbteId).single();
+      if (readError) throw readError;
+      const { error } = await (supabase as any).schema("api").rpc("delete_accounting_draft", { p_document_id: cbteId, p_sale: row.es_venta });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -421,7 +379,7 @@ export const useContabPagos = (filters?: { esCobro?: boolean }) =>
     queryFn: async () => {
       let q = (supabase as any)
         .from("contab_pagos")
-        .select("*, tercero:contab_terceros(razon_social), comprobante:contab_comprobantes(tipo,punto_venta,numero)")
+        .select("*")
         .order("fecha", { ascending: false });
       if (filters?.esCobro !== undefined) q = q.eq("es_cobro", filters.esCobro);
       const { data, error } = await q;
@@ -433,31 +391,22 @@ export const useContabPagos = (filters?: { esCobro?: boolean }) =>
 export const useSavePago = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (p: Partial<ContabPago>) => {
-      const payload: any = { ...p };
-      ["comprobante_id","tercero_id","cuenta_id","referencia","observaciones","obra_id","maquinaria_id"].forEach((k) => {
-        if (payload[k] === "") payload[k] = null;
+    mutationFn: async (p: Partial<ContabPago> & { treasury_account_id?: string | null; allocations?: { document_id: string; amount: number }[] }) => {
+      const { allocations = [], ...transaction } = p;
+      const { data, error } = await (supabase as any).schema("api").rpc("record_treasury_settlement", {
+        p_data: transaction,
+        p_allocations: allocations,
       });
-      const { data: ud } = await supabase.auth.getUser();
-      let id = payload.id;
-      if (!id) {
-        payload.created_by = ud?.user?.id ?? null;
-        const { data, error } = await (supabase as any).from("contab_pagos").insert(payload).select("id").single();
-        if (error) throw error;
-        id = data.id;
-        // Generar asiento
-        const { error: rpcErr } = await (supabase as any).rpc("contab_generar_asiento_pago", { _pago_id: id });
-        if (rpcErr) throw rpcErr;
-      } else {
-        const { error } = await (supabase as any).from("contab_pagos").update(payload).eq("id", id);
-        if (error) throw error;
-      }
-      return id as string;
+      if (error) throw error;
+      return data as string;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contab_pagos"] });
       qc.invalidateQueries({ queryKey: ["contab_comprobantes"] });
       qc.invalidateQueries({ queryKey: ["contab_asientos"] });
+      qc.invalidateQueries({ queryKey: ["accounting_open_items"] });
+      qc.invalidateQueries({ queryKey: ["accounting_summary"] });
+      qc.invalidateQueries({ queryKey: ["treasury_balances"] });
       toast.success("Movimiento registrado");
     },
     onError: (e: any) => toast.error(e.message),
@@ -468,7 +417,7 @@ export const useDeletePago = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("contab_pagos").delete().eq("id", id);
+      const { error } = await (supabase as any).schema("api").rpc("reverse_treasury_transaction", { p_transaction_id: id, p_reason: "Reversion solicitada desde Contabilidad" });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -502,7 +451,7 @@ export const useContabAsientoLineas = (asientoId: string | null) =>
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("contab_asiento_lineas")
-        .select("*, cuenta:contab_plan_cuentas(codigo,nombre), obra:obras(nombre), maquinaria:maquinarias(nombre,codigo)")
+        .select("*")
         .eq("asiento_id", asientoId)
         .order("orden");
       if (error) throw error;
@@ -520,9 +469,10 @@ export const useIvaMes = (anio: number, mes: number, esVenta: boolean) =>
       const hasta = `${anio}-${String(mes).padStart(2, "0")}-${String(hastaD).padStart(2, "0")}`;
       const { data, error } = await (supabase as any)
         .from("contab_comprobantes")
-        .select("*, tercero:contab_terceros(razon_social,cuit,condicion_iva)")
+        .select("*")
         .eq("es_venta", esVenta)
         .neq("estado", "anulado")
+        .neq("estado", "borrador")
         .gte("fecha", desde)
         .lte("fecha", hasta)
         .order("fecha");
@@ -537,12 +487,232 @@ export const useMayorCuenta = (cuentaId: string | null, desde: string, hasta: st
     enabled: !!cuentaId,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
-        .from("contab_asiento_lineas")
-        .select("*, asiento:contab_asientos!inner(fecha,descripcion,numero), obra:obras(nombre), maquinaria:maquinarias(nombre,codigo)")
+        .from("contab_mayor_lineas")
+        .select("*")
         .eq("cuenta_id", cuentaId)
-        .gte("asiento.fecha", desde)
-        .lte("asiento.fecha", hasta);
+        .gte("asiento_fecha", desde)
+        .lte("asiento_fecha", hasta);
       if (error) throw error;
       return (data ?? []) as any[];
     },
   });
+
+export const useSaveJournal = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ entry, lines }: { entry: Record<string, unknown>; lines: Record<string, unknown>[] }) => {
+      const { data, error } = await (supabase as any).schema("api").rpc("save_journal_draft", { p_entry: entry, p_lines: lines });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contab_asientos"] }); toast.success("Asiento borrador guardado"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+};
+
+export const usePostJournal = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => { const { error } = await (supabase as any).schema("api").rpc("post_journal_entry", { p_entry_id: id }); if (error) throw error; },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contab_asientos"] }); toast.success("Asiento confirmado"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+};
+
+export const useReverseJournal = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => { const { error } = await (supabase as any).schema("api").rpc("reverse_journal_entry", { p_entry_id: id, p_reason: reason }); if (error) throw error; },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contab_asientos"] }); toast.success("Asiento revertido"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+};
+
+export type AccountingDimensionRow = {
+  month: string;
+  account_code: string;
+  account_name: string;
+  account_type: "asset" | "liability" | "equity" | "revenue" | "cost" | "expense";
+  obra_id: string | null;
+  obra_name: string | null;
+  maquinaria_id: string | null;
+  maquinaria_name: string | null;
+  debit: number;
+  credit: number;
+  net: number;
+};
+
+export const useAccountingDimensionReport = (
+  from: string,
+  to: string,
+  obraId: string | null = null,
+  maquinariaId: string | null = null,
+) => useQuery({
+  queryKey: ["accounting_dimension_report", from, to, obraId, maquinariaId],
+  queryFn: async () => {
+    const { data, error } = await (supabase as any).schema("api").rpc("accounting_dimension_report", {
+      p_from: from,
+      p_to: to,
+      p_obra_id: obraId,
+      p_maquinaria_id: maquinariaId,
+    });
+    if (error) throw error;
+    return (data ?? []) as AccountingDimensionRow[];
+  },
+});
+
+export type AccountingSummary = {
+  cash: number; banks: number; receivables: number; payables: number;
+  vat_debit: number; vat_credit: number; vat_position: number;
+  income: number; costs: number; result: number;
+  receivables_upcoming: number; payables_upcoming: number;
+  receivables_overdue: number; payables_overdue: number;
+};
+
+export type AccountingOpenItem = {
+  document_id: string; party_id: string; party_name: string; source_type: string;
+  source_id: string; document_kind: "charge" | "credit"; issue_date: string;
+  due_date: string | null; original_amount: number; applied_amount: number;
+  balance: number; status: string; days_overdue: number;
+};
+
+export type TreasuryBalance = {
+  account_id: string; name: string; account_type: "cash" | "bank";
+  bank_name: string | null; account_number: string | null; currency: string;
+  is_active: boolean; balance: number;
+};
+
+export const useAccountingSummary = (from: string, to: string, asOf: string) =>
+  useQuery({
+    queryKey: ["accounting_summary", from, to, asOf],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).schema("api").rpc("accounting_summary", { p_from: from, p_to: to, p_as_of: asOf });
+      if (error) throw error;
+      return data as AccountingSummary;
+    },
+  });
+
+export const useAccountingOpenItems = (kind: "payable" | "receivable", partyId: string | null = null, asOf = new Date().toISOString().slice(0, 10)) =>
+  useQuery({
+    queryKey: ["accounting_open_items", kind, partyId, asOf],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).schema("api").rpc("accounting_open_items", { p_kind: kind, p_party_id: partyId, p_as_of: asOf });
+      if (error) throw error;
+      return (data ?? []) as AccountingOpenItem[];
+    },
+  });
+
+export const useTreasuryBalances = (asOf = new Date().toISOString().slice(0, 10)) =>
+  useQuery({
+    queryKey: ["treasury_balances", asOf],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).schema("api").rpc("treasury_balances", { p_as_of: asOf });
+      if (error) throw error;
+      return (data ?? []) as TreasuryBalance[];
+    },
+  });
+
+export const useTrialBalance = (from: string, to: string) =>
+  useQuery({
+    queryKey: ["accounting_trial_balance", from, to],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).schema("api").rpc("accounting_trial_balance", { p_from: from, p_to: to });
+      if (error) throw error;
+      return (data ?? []) as Array<{ account_id: string; code: string; name: string; account_type: string; total_debit: number; total_credit: number; balance: number }>;
+    },
+  });
+
+export const useAccountingLedger = (accountId: string | null, from: string, to: string) =>
+  useQuery({
+    queryKey: ["accounting_ledger", accountId, from, to],
+    enabled: !!accountId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).schema("api").rpc("accounting_ledger", { p_account_id: accountId, p_from: from, p_to: to });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+export const useVatPosition = (year: number, month: number) =>
+  useQuery({
+    queryKey: ["accounting_vat_position", year, month],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).schema("api").rpc("accounting_vat_position", { p_year: year, p_month: month });
+      if (error) throw error;
+      return data as { sales: any[]; purchases: any[]; vat_debit: number; vat_credit: number; position: number };
+    },
+  });
+
+export const usePartyStatement = (kind: "payable" | "receivable", partyId: string | null, from: string, to: string) =>
+  useQuery({
+    queryKey: ["accounting_party_statement", kind, partyId, from, to],
+    enabled: !!partyId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).schema("api").rpc("accounting_party_statement", { p_kind: kind, p_party_id: partyId, p_from: from, p_to: to });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+export const useCreateInvoiceFromCertificate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (certificateId: string) => {
+      const { data, error } = await (supabase as any).schema("api").rpc("create_customer_invoice_from_certificate", { p_certificate_id: certificateId });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contab_comprobantes"] });
+      toast.success("Factura borrador creada desde el certificado");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+};
+
+export const useSaveTreasuryAccount = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const { data, error } = await (supabase as any).schema("api").rpc("save_treasury_account", { p_data: payload });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["treasury_balances"] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+};
+
+export const useTreasuryTransfer = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { from: string; to: string; date: string; amount: number; reference?: string }) => {
+      const { data, error } = await (supabase as any).schema("api").rpc("record_treasury_transfer", { p_from_account: payload.from, p_to_account: payload.to, p_date: payload.date, p_amount: payload.amount, p_reference: payload.reference || null });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["treasury_balances"] }); qc.invalidateQueries({ queryKey: ["contab_pagos"] }); toast.success("Transferencia registrada"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+};
+
+export const useSetAccountingPeriod = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ year, month, status }: { year: number; month: number; status: "open" | "closed" }) => {
+      const { error } = await (supabase as any).schema("api").rpc("set_accounting_period", { p_year: year, p_month: month, p_status: status });
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounting_periods"] }); toast.success("Período actualizado"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+};
+
+export const useAccountingPeriods = () => useQuery({
+  queryKey: ["accounting_periods"],
+  queryFn: async () => {
+    const { data, error } = await (supabase as any).from("accounting_periods").select("id,year,month,status,closed_at,reopened_at").order("year", { ascending: false }).order("month", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  },
+});

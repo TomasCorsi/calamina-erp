@@ -602,3 +602,59 @@ set modalidad=excluded.modalidad, sueldo_blanco=excluded.sueldo_blanco,
     sueldo_negro=excluded.sueldo_negro, monto_banco_fijo=excluded.monto_banco_fijo,
     resto_efectivo=excluded.resto_efectivo, banco=excluded.banco,
     numero_cuenta=excluded.numero_cuenta;
+
+-- Accounting: deterministic local-only chart and bridges.
+insert into public.accounting_accounts
+  (id,company_id,code,name,account_type,normal_balance,is_system,requires_work,system_key)
+values
+('30000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','1.1.1.01','Caja','asset','debit',true,false,'cash'),
+('30000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','1.1.1.02','Bancos','asset','debit',true,false,'banks'),
+('30000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000001','1.1.2.01','Clientes','asset','debit',true,false,'accounts_receivable'),
+('30000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000001','1.1.3.01','Anticipos a proveedores','asset','debit',true,false,'supplier_advances'),
+('30000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000001','1.1.3.02','Anticipos al personal','asset','debit',true,false,'employee_advances'),
+('30000000-0000-4000-8000-000000000006','00000000-0000-4000-8000-000000000001','1.1.3.03','Prestamos al personal','asset','debit',true,false,'employee_loans'),
+('30000000-0000-4000-8000-000000000007','00000000-0000-4000-8000-000000000001','1.1.4.01','IVA credito fiscal','asset','debit',true,false,'vat_credit'),
+('30000000-0000-4000-8000-000000000008','00000000-0000-4000-8000-000000000001','1.1.4.02','Percepciones y retenciones a favor','asset','debit',true,false,'tax_credits'),
+('30000000-0000-4000-8000-000000000009','00000000-0000-4000-8000-000000000001','1.1.5.01','Otros creditos','asset','debit',true,false,'other_receivables'),
+('30000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000001','1.2.1.01','Maquinarias y vehiculos','asset','debit',true,false,'machinery_assets'),
+('30000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000001','1.2.1.99','Depreciacion acumulada','asset','credit',true,false,'accumulated_depreciation'),
+('30000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001','2.1.1.01','Proveedores','liability','credit',true,false,'accounts_payable'),
+('30000000-0000-4000-8000-000000000013','00000000-0000-4000-8000-000000000001','2.1.2.01','Sueldos a pagar','liability','credit',true,false,'wages_payable'),
+('30000000-0000-4000-8000-000000000014','00000000-0000-4000-8000-000000000001','2.1.2.02','Cargas sociales a pagar','liability','credit',true,false,'social_charges_payable'),
+('30000000-0000-4000-8000-000000000015','00000000-0000-4000-8000-000000000001','2.1.3.01','IVA debito fiscal','liability','credit',true,false,'vat_debit'),
+('30000000-0000-4000-8000-000000000016','00000000-0000-4000-8000-000000000001','2.1.3.02','Retenciones a depositar','liability','credit',true,false,'withholdings_payable'),
+('30000000-0000-4000-8000-000000000017','00000000-0000-4000-8000-000000000001','2.1.3.03','Impuestos a pagar','liability','credit',true,false,'taxes_payable'),
+('30000000-0000-4000-8000-000000000018','00000000-0000-4000-8000-000000000001','2.1.4.01','Anticipos de clientes','liability','credit',true,false,'customer_advances'),
+('30000000-0000-4000-8000-000000000019','00000000-0000-4000-8000-000000000001','2.2.1.01','Prestamos financieros','liability','credit',true,false,'financial_loans'),
+('30000000-0000-4000-8000-000000000020','00000000-0000-4000-8000-000000000001','3.1.1.01','Capital','equity','credit',true,false,'capital'),
+('30000000-0000-4000-8000-000000000021','00000000-0000-4000-8000-000000000001','3.1.2.01','Resultados acumulados','equity','credit',true,false,'retained_earnings'),
+('30000000-0000-4000-8000-000000000022','00000000-0000-4000-8000-000000000001','3.1.3.01','Resultado del ejercicio','equity','credit',true,false,'current_result'),
+('30000000-0000-4000-8000-000000000023','00000000-0000-4000-8000-000000000001','4.1.1.01','Ingresos por obras y certificados','revenue','credit',true,true,'revenue_works'),
+('30000000-0000-4000-8000-000000000024','00000000-0000-4000-8000-000000000001','4.1.2.01','Otros ingresos operativos','revenue','credit',true,false,'other_revenue'),
+('30000000-0000-4000-8000-000000000025','00000000-0000-4000-8000-000000000001','4.1.3.01','Resultados financieros','revenue','credit',true,false,'financial_income'),
+('30000000-0000-4000-8000-000000000026','00000000-0000-4000-8000-000000000001','5.1.1.01','Materiales y compras directas','cost','debit',true,true,'cost_materials'),
+('30000000-0000-4000-8000-000000000027','00000000-0000-4000-8000-000000000001','5.1.2.01','Combustible','cost','debit',true,true,'cost_fuel'),
+('30000000-0000-4000-8000-000000000028','00000000-0000-4000-8000-000000000001','5.1.3.01','Mantenimiento y reparaciones','cost','debit',true,false,'cost_maintenance'),
+('30000000-0000-4000-8000-000000000029','00000000-0000-4000-8000-000000000001','5.1.4.01','Mano de obra directa','cost','debit',true,true,'cost_direct_labor'),
+('30000000-0000-4000-8000-000000000030','00000000-0000-4000-8000-000000000001','5.1.5.01','Alquileres transportes y servicios','cost','debit',true,true,'cost_services'),
+('30000000-0000-4000-8000-000000000031','00000000-0000-4000-8000-000000000001','6.1.1.01','Sueldos administrativos','expense','debit',true,false,'expense_admin_wages'),
+('30000000-0000-4000-8000-000000000032','00000000-0000-4000-8000-000000000001','6.1.1.02','Cargas sociales','expense','debit',true,false,'expense_social_charges'),
+('30000000-0000-4000-8000-000000000033','00000000-0000-4000-8000-000000000001','6.1.2.01','Gastos generales','expense','debit',true,false,'expense_general'),
+('30000000-0000-4000-8000-000000000034','00000000-0000-4000-8000-000000000001','6.1.3.01','Honorarios y servicios','expense','debit',true,false,'expense_services'),
+('30000000-0000-4000-8000-000000000035','00000000-0000-4000-8000-000000000001','6.1.4.01','Gastos bancarios','expense','debit',true,false,'expense_bank'),
+('30000000-0000-4000-8000-000000000036','00000000-0000-4000-8000-000000000001','6.1.5.01','Impuestos y tasas','expense','debit',true,false,'expense_taxes'),
+('30000000-0000-4000-8000-000000000037','00000000-0000-4000-8000-000000000001','6.1.6.01','Depreciaciones','expense','debit',true,false,'expense_depreciation'),
+('30000000-0000-4000-8000-000000000038','00000000-0000-4000-8000-000000000001','6.1.9.01','Otros gastos','expense','debit',true,false,'expense_other')
+on conflict(id) do update set name=excluded.name,is_active=true,requires_work=excluded.requires_work;
+
+insert into public.accounting_parties(id,company_id,party_type,client_id,tax_condition)
+values('31000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','customer','00000000-0000-4000-8002-000000000001','RI')
+on conflict(id) do update set is_active=true;
+insert into public.accounting_parties(id,company_id,party_type,supplier_id,tax_condition)
+values('31000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','supplier','00000000-0000-4000-8015-000000000001','RI')
+on conflict(id) do update set is_active=true;
+
+insert into public.treasury_accounts(id,company_id,ledger_account_id,account_type,name,currency) values
+('32000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000001','cash','Caja principal','ARS'),
+('32000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','30000000-0000-4000-8000-000000000002','bank','Banco demo','ARS')
+on conflict(id) do update set name=excluded.name,is_active=true;

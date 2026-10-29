@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, FileText, Trash2, CheckCircle2, Ban, Edit3 } from "lucide-react";
+import { Plus, FileText, Trash2, CheckCircle2, Ban, Edit3, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +8,15 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   useContabComprobantes, useDeleteComprobante, useConfirmarComprobante, useAnularComprobante,
+  useCreateInvoiceFromCertificate,
   type ContabComprobante, type CbteEstado, type CbteTipo,
 } from "@/hooks/useContabilidad";
 import { ComprobanteDialog } from "./ComprobanteDialog";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const TIPO_LABEL: Record<CbteTipo, string> = {
   FA_A: "Factura A", FA_B: "Factura B", FA_C: "Factura C",
@@ -46,6 +50,7 @@ export function ComprobantesTab({ esVenta }: { esVenta: boolean }) {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [delId, setDelId] = useState<string | null>(null);
+  const [certificateOpen, setCertificateOpen] = useState(false);
 
   const { data = [], isLoading } = useContabComprobantes({ esVenta });
   const del = useDeleteComprobante();
@@ -80,10 +85,10 @@ export function ComprobantesTab({ esVenta }: { esVenta: boolean }) {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
         />
-        <Button onClick={handleNew}>
+        <div className="flex gap-2">{esVenta && <Button variant="outline" onClick={() => setCertificateOpen(true)}><Award className="w-4 h-4 mr-2" />Desde certificado</Button>}<Button onClick={handleNew}>
           <Plus className="w-4 h-4 mr-2" />
           Nuevo {esVenta ? "comprobante de venta" : "comprobante de compra"}
-        </Button>
+        </Button></div>
       </div>
 
       <Card>
@@ -168,6 +173,7 @@ export function ComprobantesTab({ esVenta }: { esVenta: boolean }) {
           esVenta={esVenta}
         />
       )}
+      {certificateOpen && <CertificateInvoiceDialog onClose={() => setCertificateOpen(false)} />}
 
       <AlertDialog open={!!delId} onOpenChange={(v) => !v && setDelId(null)}>
         <AlertDialogContent>
@@ -185,4 +191,14 @@ export function ComprobantesTab({ esVenta }: { esVenta: boolean }) {
       </AlertDialog>
     </div>
   );
+}
+
+function CertificateInvoiceDialog({ onClose }: { onClose: () => void }) {
+  const create = useCreateInvoiceFromCertificate();
+  const { data = [] } = useQuery({ queryKey: ["accounting_available_certificates"], queryFn: async () => {
+    const { data, error } = await (supabase as any).from("certificados").select("id,numero,periodo,total,estado").in("estado", ["emitido","cobrado"]).order("fecha_certificado", { ascending: false }).limit(100);
+    if (error) throw error; return data ?? [];
+  }});
+  const select = async (id: string) => { await create.mutateAsync(id); onClose(); };
+  return <Dialog open onOpenChange={(v) => !v && onClose()}><DialogContent><DialogHeader><DialogTitle>Crear factura desde certificado</DialogTitle></DialogHeader><div className="max-h-96 overflow-y-auto divide-y">{data.length===0&&<p className="py-6 text-center text-muted-foreground">No hay certificados emitidos disponibles.</p>}{data.map((c:any)=><button key={c.id} className="w-full p-3 text-left hover:bg-muted rounded-md" onClick={()=>select(c.id)}><span className="font-medium">{c.numero}</span><span className="text-sm text-muted-foreground ml-2">{c.periodo} · {fmt(c.total)}</span></button>)}</div></DialogContent></Dialog>;
 }

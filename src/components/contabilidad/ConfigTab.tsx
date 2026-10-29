@@ -43,7 +43,7 @@ export function ConfigTab() {
   );
 }
 
-function EmpresaForm() {
+export function EmpresaForm() {
   const { data } = useContabEmpresa();
   const save = useSaveContabEmpresa();
   const [form, setForm] = useState<Partial<ContabEmpresa>>({ condicion_iva: "RI" });
@@ -85,7 +85,7 @@ function EmpresaForm() {
   );
 }
 
-function PlanCuentas() {
+export function PlanCuentas() {
   const { data: cuentas = [] } = useContabPlanCuentas();
   const save = useSaveCuenta();
   const del = useDeleteCuenta();

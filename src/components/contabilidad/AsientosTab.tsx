@@ -1,97 +1,28 @@
 import { useState } from "react";
-import { ChevronRight, BookOpen } from "lucide-react";
+import { Ban, BookOpen, CheckCircle2, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useContabAsientos, useContabAsientoLineas } from "@/hooks/useContabilidad";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useContabAsientos, useContabAsientoLineas, useContabPlanCuentas, useSaveJournal, usePostJournal, useReverseJournal } from "@/hooks/useContabilidad";
+import { useObras } from "@/hooks/useObras";
+import { useMaquinarias } from "@/hooks/useMaquinarias";
 
 const fmt = (n: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(Number(n || 0));
 const fmtDate = (s: string) => { const [y,m,d]=s.split("-"); return `${d}/${m}/${y}`; };
 
 export function AsientosTab() {
-  const { data = [] } = useContabAsientos();
-  const [openId, setOpenId] = useState<string | null>(null);
-
-  return (
-    <div className="space-y-3">
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left">
-                <tr>
-                  <th className="px-3 py-2 w-16">N°</th>
-                  <th className="px-3 py-2">Fecha</th>
-                  <th className="px-3 py-2">Descripción</th>
-                  <th className="px-3 py-2">Origen</th>
-                  <th className="px-3 py-2 text-right">Debe</th>
-                  <th className="px-3 py-2 text-right">Haber</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                    <BookOpen className="inline w-4 h-4 mr-2" />No hay asientos
-                  </td></tr>
-                )}
-                {data.map((a) => (
-                  <tr key={a.id} className="border-t hover:bg-muted/30">
-                    <td className="px-3 py-2 font-mono">{a.numero}</td>
-                    <td className="px-3 py-2">{fmtDate(a.fecha)}</td>
-                    <td className="px-3 py-2">{a.descripcion}</td>
-                    <td className="px-3 py-2 text-xs">{a.origen ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmt(a.total_debe)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmt(a.total_haber)}</td>
-                    <td className="px-3 py-2 text-right">
-                      <Button size="icon" variant="ghost" onClick={() => setOpenId(a.id)}>
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {openId && <AsientoDetalle id={openId} onClose={() => setOpenId(null)} />}
-    </div>
-  );
+  const { data=[] }=useContabAsientos(); const [openId,setOpenId]=useState<string|null>(null); const [create,setCreate]=useState(false); const post=usePostJournal(); const reverse=useReverseJournal();
+  return <div className="space-y-3"><div className="flex justify-end"><Button onClick={()=>setCreate(true)}><Plus className="w-4 h-4 mr-2"/>Nuevo asiento</Button></div><Card><CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-muted/50 text-left"><tr><th className="px-3 py-2">N°</th><th className="px-3 py-2">Fecha</th><th className="px-3 py-2">Descripción</th><th className="px-3 py-2">Origen</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2 text-right">Debe</th><th className="px-3 py-2 text-right">Haber</th><th/></tr></thead><tbody>
+    {data.length===0&&<tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground"><BookOpen className="inline w-4 h-4 mr-2"/>No hay asientos</td></tr>}
+    {data.map(a=><tr key={a.id} className="border-t hover:bg-muted/30"><td className="px-3 py-2 font-mono">{a.numero??"Borrador"}</td><td className="px-3 py-2">{fmtDate(a.fecha)}</td><td className="px-3 py-2">{a.descripcion}</td><td className="px-3 py-2 text-xs">{a.origen??"—"}</td><td className="px-3 py-2 capitalize">{a.status}</td><td className="px-3 py-2 text-right">{fmt(a.total_debe)}</td><td className="px-3 py-2 text-right">{fmt(a.total_haber)}</td><td className="px-3 py-2 text-right whitespace-nowrap"><Button size="icon" variant="ghost" onClick={()=>setOpenId(a.id)}><ChevronRight className="w-4 h-4"/></Button>{a.status==="draft"&&<Button size="icon" variant="ghost" onClick={()=>post.mutate(a.id)}><CheckCircle2 className="w-4 h-4 text-green-600"/></Button>}{a.status==="posted"&&<Button size="icon" variant="ghost" onClick={()=>reverse.mutate({id:a.id,reason:"Corrección manual"})}><Ban className="w-4 h-4 text-amber-600"/></Button>}</td></tr>)}
+  </tbody></table></div></CardContent></Card>{openId&&<AsientoDetalle id={openId} onClose={()=>setOpenId(null)}/>} {create&&<ManualJournalDialog onClose={()=>setCreate(false)}/>}</div>;
 }
 
-function AsientoDetalle({ id, onClose }: { id: string; onClose: () => void }) {
-  const { data: lineas = [] } = useContabAsientoLineas(id);
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Detalle del asiento</DialogTitle></DialogHeader>
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left">
-            <tr>
-              <th className="px-2 py-1">Cuenta</th>
-              <th className="px-2 py-1">Descripción</th>
-              <th className="px-2 py-1">Obra</th>
-              <th className="px-2 py-1">Máquina</th>
-              <th className="px-2 py-1 text-right">Debe</th>
-              <th className="px-2 py-1 text-right">Haber</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lineas.map((l) => (
-              <tr key={l.id} className="border-t">
-                <td className="px-2 py-1 text-xs">{l.cuenta ? `${l.cuenta.codigo} · ${l.cuenta.nombre}` : "—"}</td>
-                <td className="px-2 py-1">{l.descripcion}</td>
-                <td className="px-2 py-1 text-xs">{l.obra?.nombre ?? "—"}</td>
-                <td className="px-2 py-1 text-xs">{l.maquinaria ? (l.maquinaria.codigo || l.maquinaria.nombre) : "—"}</td>
-                <td className="px-2 py-1 text-right tabular-nums">{l.debe > 0 ? fmt(l.debe) : ""}</td>
-                <td className="px-2 py-1 text-right tabular-nums">{l.haber > 0 ? fmt(l.haber) : ""}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </DialogContent>
-    </Dialog>
-  );
-}
+function AsientoDetalle({id,onClose}:{id:string;onClose:()=>void}){const{data=[]}=useContabAsientoLineas(id);return <Dialog open onOpenChange={v=>!v&&onClose()}><DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Detalle del asiento</DialogTitle></DialogHeader><table className="w-full text-sm"><thead className="bg-muted/50"><tr><th className="text-left p-2">Cuenta</th><th className="text-left p-2">Descripción</th><th className="text-left p-2">Obra</th><th className="text-left p-2">Máquina</th><th className="text-right p-2">Debe</th><th className="text-right p-2">Haber</th></tr></thead><tbody>{data.map(l=><tr key={l.id} className="border-t"><td className="p-2">{l.cuenta?`${l.cuenta.codigo} · ${l.cuenta.nombre}`:"—"}</td><td className="p-2">{l.descripcion}</td><td className="p-2">{l.obra?.nombre??"—"}</td><td className="p-2">{l.maquinaria?.codigo||l.maquinaria?.nombre||"—"}</td><td className="p-2 text-right">{l.debe?fmt(l.debe):""}</td><td className="p-2 text-right">{l.haber?fmt(l.haber):""}</td></tr>)}</tbody></table></DialogContent></Dialog>}
+
+type DraftLine={account_id:string;description:string;debit:number;credit:number;obra_id:string;maquinaria_id:string};
+const blank=():DraftLine=>({account_id:"",description:"",debit:0,credit:0,obra_id:"",maquinaria_id:""});
+function ManualJournalDialog({onClose}:{onClose:()=>void}){const{data:accounts=[]}=useContabPlanCuentas();const{obras=[]}=useObras();const{maquinarias=[]}=useMaquinarias();const save=useSaveJournal();const[date,setDate]=useState(new Date().toISOString().slice(0,10));const[description,setDescription]=useState("");const[lines,setLines]=useState<DraftLine[]>([blank(),blank()]);const setLine=(i:number,p:Partial<DraftLine>)=>setLines(old=>old.map((l,n)=>n===i?{...l,...p}:l));const submit=async()=>{await save.mutateAsync({entry:{entry_date:date,description,origin:"manual"},lines:lines.map(l=>({...l,obra_id:l.obra_id||null,maquinaria_id:l.maquinaria_id||null}))});onClose()};return <Dialog open onOpenChange={v=>!v&&onClose()}><DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Nuevo asiento manual</DialogTitle></DialogHeader><div className="grid sm:grid-cols-3 gap-3"><div><Label>Fecha</Label><Input type="date" value={date} onChange={e=>setDate(e.target.value)}/></div><div className="sm:col-span-2"><Label>Descripción</Label><Input value={description} onChange={e=>setDescription(e.target.value)}/></div></div><div className="space-y-2 mt-4">{lines.map((l,i)=><div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2"><div className="col-span-3"><Label>Cuenta</Label><Select value={l.account_id} onValueChange={v=>setLine(i,{account_id:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{accounts.filter(a=>a.imputable&&a.activa).map(a=><SelectItem key={a.id} value={a.id}>{a.codigo} · {a.nombre}</SelectItem>)}</SelectContent></Select></div><div className="col-span-2"><Label>Detalle</Label><Input value={l.description} onChange={e=>setLine(i,{description:e.target.value})}/></div><div><Label>Debe</Label><Input type="number" value={l.debit} onChange={e=>setLine(i,{debit:+e.target.value,credit:0})}/></div><div><Label>Haber</Label><Input type="number" value={l.credit} onChange={e=>setLine(i,{credit:+e.target.value,debit:0})}/></div><div className="col-span-2"><Label>Obra</Label><Select value={l.obra_id||"_"} onValueChange={v=>setLine(i,{obra_id:v==="_"?"":v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="_">—</SelectItem>{obras.map(o=><SelectItem key={o.id} value={o.id}>{o.nombre}</SelectItem>)}</SelectContent></Select></div><div className="col-span-2"><Label>Máquina</Label><Select value={l.maquinaria_id||"_"} onValueChange={v=>setLine(i,{maquinaria_id:v==="_"?"":v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="_">—</SelectItem>{maquinarias.map((m:any)=><SelectItem key={m.id} value={m.id}>{m.codigo||m.nombre}</SelectItem>)}</SelectContent></Select></div><Button size="icon" variant="ghost" disabled={lines.length<=2} onClick={()=>setLines(old=>old.filter((_,n)=>n!==i))}><Trash2 className="w-4 h-4"/></Button></div>)}</div><Button variant="outline" onClick={()=>setLines(old=>[...old,blank()])}><Plus className="w-4 h-4 mr-2"/>Agregar línea</Button><DialogFooter><Button variant="outline" onClick={onClose}>Cancelar</Button><Button onClick={submit} disabled={!description||lines.some(l=>!l.account_id||(!l.debit&&!l.credit))}>Guardar borrador</Button></DialogFooter></DialogContent></Dialog>}

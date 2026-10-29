@@ -8,7 +8,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useIvaMes, useContabComprobantes, type CbteTipo } from "@/hooks/useContabilidad";
+import { useIvaMes, useAccountingDimensionReport, type CbteTipo } from "@/hooks/useContabilidad";
 import { useObras } from "@/hooks/useObras";
 import { useMaquinarias } from "@/hooks/useMaquinarias";
 
@@ -28,13 +28,11 @@ const download = (filename: string, content: string) => {
 
 export function ReportesTab() {
   return (
-    <Tabs defaultValue="iva" className="w-full">
+    <Tabs defaultValue="obras" className="w-full">
       <TabsList>
-        <TabsTrigger value="iva">Libro IVA</TabsTrigger>
         <TabsTrigger value="obras">Rentabilidad por Obra</TabsTrigger>
         <TabsTrigger value="maquinas">Costo por Máquina</TabsTrigger>
       </TabsList>
-      <TabsContent value="iva" className="mt-4"><IvaReport /></TabsContent>
       <TabsContent value="obras" className="mt-4"><RentabilidadObra /></TabsContent>
       <TabsContent value="maquinas" className="mt-4"><CostoMaquina /></TabsContent>
     </Tabs>
@@ -155,25 +153,19 @@ function IvaReport() {
 
 function RentabilidadObra() {
   const { obras = [] } = useObras();
-  const { data: ventas = [] } = useContabComprobantes({ esVenta: true });
-  const { data: compras = [] } = useContabComprobantes({ esVenta: false });
+  const { from, to } = accountingYearRange();
+  const { data = [] } = useAccountingDimensionReport(from, to);
 
   const rows = useMemo(() => {
     const acc: Record<string, { obra: string; ventas: number; compras: number }> = {};
     obras.forEach((o: any) => { acc[o.id] = { obra: o.nombre, ventas: 0, compras: 0 }; });
-    const sum = (cbtes: any[], esVenta: boolean) => {
-      cbtes.filter((c) => c.estado !== "anulado").forEach((c) => {
-        const neto = +c.neto_21 + +c.neto_105 + +c.neto_27 + +c.neto_0 + +c.exento + +c.no_gravado;
-        if (c.obra_id && acc[c.obra_id]) {
-          if (esVenta) acc[c.obra_id].ventas += neto;
-          else acc[c.obra_id].compras += neto;
-        }
-      });
-    };
-    sum(ventas, true);
-    sum(compras, false);
+    data.forEach((row) => {
+      if (!row.obra_id || !acc[row.obra_id]) return;
+      if (row.account_type === "revenue") acc[row.obra_id].ventas += +row.net;
+      if (row.account_type === "cost" || row.account_type === "expense") acc[row.obra_id].compras += +row.net;
+    });
     return Object.values(acc).filter((r) => r.ventas > 0 || r.compras > 0);
-  }, [obras, ventas, compras]);
+  }, [obras, data]);
 
   return (
     <Card>
@@ -213,17 +205,19 @@ function RentabilidadObra() {
 
 function CostoMaquina() {
   const { maquinarias = [] } = useMaquinarias();
-  const { data: compras = [] } = useContabComprobantes({ esVenta: false });
+  const { from, to } = accountingYearRange();
+  const { data = [] } = useAccountingDimensionReport(from, to);
 
   const rows = useMemo(() => {
     const acc: Record<string, { nombre: string; total: number }> = {};
     maquinarias.forEach((m: any) => { acc[m.id] = { nombre: m.codigo || m.nombre, total: 0 }; });
-    compras.filter((c) => c.estado !== "anulado").forEach((c) => {
-      const neto = +c.neto_21 + +c.neto_105 + +c.neto_27 + +c.neto_0 + +c.exento + +c.no_gravado;
-      if (c.maquinaria_id && acc[c.maquinaria_id]) acc[c.maquinaria_id].total += neto;
+    data.forEach((row) => {
+      if (row.maquinaria_id && acc[row.maquinaria_id] && (row.account_type === "cost" || row.account_type === "expense")) {
+        acc[row.maquinaria_id].total += +row.net;
+      }
     });
     return Object.values(acc).filter((r) => r.total > 0).sort((a, b) => b.total - a.total);
-  }, [maquinarias, compras]);
+  }, [maquinarias, data]);
 
   return (
     <Card>
@@ -249,4 +243,9 @@ function CostoMaquina() {
       </CardContent>
     </Card>
   );
+}
+
+function accountingYearRange() {
+  const year = new Date().getFullYear();
+  return { from: `${year}-01-01`, to: `${year}-12-31` };
 }

@@ -4,7 +4,6 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { LoadingScreen } from "@/components/shared/LoadingScreen";
-import { LegacyModuleUnavailable } from "@/components/shared/LegacyModuleUnavailable";
 import Login from "./pages/Login";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -41,6 +40,19 @@ const TableroTV = lazy(() => import("./pages/TableroTV"));
 const Reportes = lazy(() => import("./pages/Reportes"));
 const Mensajes = lazy(() => import("./pages/Mensajes"));
 const RRHH = lazy(() => import("./pages/RRHH"));
+const Contabilidad = lazy(() => import("./pages/Contabilidad"));
+const ContabilidadResumen = lazy(() => import("./pages/contabilidad/Resumen"));
+const ContabilidadVentas = lazy(() => import("./pages/contabilidad/Ventas"));
+const ContabilidadCompras = lazy(() => import("./pages/contabilidad/Compras"));
+const ContabilidadPagos = lazy(() => import("./pages/contabilidad/Pagos"));
+const ContabilidadCobranzas = lazy(() => import("./pages/contabilidad/Cobranzas"));
+const ContabilidadCajaBancos = lazy(() => import("./pages/contabilidad/CajaBancos"));
+const ContabilidadProveedores = lazy(() => import("./pages/contabilidad/Proveedores"));
+const ContabilidadClientes = lazy(() => import("./pages/contabilidad/Clientes"));
+const ContabilidadContable = lazy(() => import("./pages/contabilidad/Contable"));
+const ContabilidadIva = lazy(() => import("./pages/contabilidad/Iva"));
+const ContabilidadInformes = lazy(() => import("./pages/contabilidad/Informes"));
+const ContabilidadConfiguracion = lazy(() => import("./pages/contabilidad/Configuracion"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,10 +66,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-const pendingModules = [
-  ["/contabilidad", "Contabilidad", "Contabilidad en preparación"],
-] as const;
 
 export default function App() {
   return (
@@ -102,10 +110,20 @@ export default function App() {
                   <Route path="/mensajes" element={<ProtectedRoute requiredPermissions={["mensajes.view"]}><Mensajes /></ProtectedRoute>} />
                   <Route path="/rrhh" element={<ProtectedRoute requiredPermissions={["rrhh.view"]}><RRHH /></ProtectedRoute>} />
                   <Route path="/configuracion" element={<ProtectedRoute requiredPermissions={["users.view", "users.invite", "users.manage_roles"]}><Configuracion /></ProtectedRoute>} />
+                  <Route path="/contabilidad" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><Contabilidad /></ProtectedRoute>} />
+                  <Route path="/contabilidad/resumen" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><ContabilidadResumen /></ProtectedRoute>} />
+                  <Route path="/contabilidad/ventas" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><ContabilidadVentas /></ProtectedRoute>} />
+                  <Route path="/contabilidad/compras" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><ContabilidadCompras /></ProtectedRoute>} />
+                  <Route path="/contabilidad/pagos" element={<ProtectedRoute requiredPermissions={["treasury.view"]}><ContabilidadPagos /></ProtectedRoute>} />
+                  <Route path="/contabilidad/cobranzas" element={<ProtectedRoute requiredPermissions={["treasury.view"]}><ContabilidadCobranzas /></ProtectedRoute>} />
+                  <Route path="/contabilidad/caja-bancos" element={<ProtectedRoute requiredPermissions={["treasury.view"]}><ContabilidadCajaBancos /></ProtectedRoute>} />
+                  <Route path="/contabilidad/proveedores" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><ContabilidadProveedores /></ProtectedRoute>} />
+                  <Route path="/contabilidad/clientes" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><ContabilidadClientes /></ProtectedRoute>} />
+                  <Route path="/contabilidad/contable" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><ContabilidadContable /></ProtectedRoute>} />
+                  <Route path="/contabilidad/iva" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><ContabilidadIva /></ProtectedRoute>} />
+                  <Route path="/contabilidad/informes" element={<ProtectedRoute requiredPermissions={["accounting.view"]}><ContabilidadInformes /></ProtectedRoute>} />
+                  <Route path="/contabilidad/configuracion" element={<ProtectedRoute requiredPermissions={["accounting.manage"]}><ContabilidadConfiguracion /></ProtectedRoute>} />
                   <Route path="/usuarios" element={<Navigate to="/configuracion" replace />} />
-                  {pendingModules.map(([path, title, subtitle]) => (
-                    <Route key={path} path={path} element={<ProtectedRoute adminOnly><LegacyModuleUnavailable title={title} subtitle={subtitle} /></ProtectedRoute>} />
-                  ))}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>

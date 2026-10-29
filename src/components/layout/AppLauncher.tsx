@@ -165,7 +165,7 @@ export function AppLauncher({ className }: AppLauncherProps) {
             </h3>
             <div className="grid grid-cols-3 gap-2">
               {category.apps.map((app, appIndex) => {
-                const isActive = location.pathname === app.path;
+                const isActive = location.pathname === app.path || location.pathname.startsWith(`${app.path}/`);
                 const Icon = app.icon;
 
                 return (

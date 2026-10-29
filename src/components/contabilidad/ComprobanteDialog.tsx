@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  useContabComprobanteItems, useSaveComprobante, useContabTerceros, useContabPlanCuentas,
+  useContabComprobanteItems, useSaveComprobante, useContabPlanCuentas,
   type ContabComprobante, type ContabCbteItem, type CbteTipo,
 } from "@/hooks/useContabilidad";
 import { useObras } from "@/hooks/useObras";
@@ -73,7 +73,6 @@ const blankItem = (): ItemDraft => ({
 });
 
 export function ComprobanteDialog({ open, onClose, comprobanteId, esVenta }: Props) {
-  const { data: terceros = [] } = useContabTerceros();
   const { data: cuentas = [] } = useContabPlanCuentas();
   const { obras = [] } = useObras();
   const { maquinarias: maquinas = [] } = useMaquinarias();
@@ -86,8 +85,32 @@ export function ComprobanteDialog({ open, onClose, comprobanteId, esVenta }: Pro
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("contab_comprobantes").select("*").eq("id", comprobanteId).single();
       if (error) throw error;
-      return data as ContabComprobante;
+      const table = esVenta ? "customer_invoices" : "supplier_invoices";
+      const columns = esVenta ? "client_id,certificate_id" : "supplier_id,purchase_order_id";
+      const { data: source, error: sourceError } = await (supabase as any).from(table).select(columns).eq("id", comprobanteId).single();
+      if (sourceError) throw sourceError;
+      return { ...data, ...source, master_id: esVenta ? source.client_id : source.supplier_id } as ContabComprobante & { master_id: string; certificate_id?: string; purchase_order_id?: string };
     },
+  });
+  const { data: masters = [] } = useQuery({
+    queryKey: ["accounting_document_masters", esVenta],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from(esVenta ? "clientes" : "proveedores").select("id,nombre,cuit").eq(esVenta ? "activo" : "activo", true).order("nombre");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: related = [] } = useQuery({
+    queryKey: ["accounting_document_sources", esVenta],
+    queryFn: async () => {
+      const table = esVenta ? "certificados" : "ordenes_compra";
+      const columns = esVenta ? "id,numero,obra_id,estado" : "id,numero,proveedor_id,obra_id,estado";
+      const { data, error } = await (supabase as any).from(table).select(columns).order(esVenta ? "fecha_certificado" : "fecha", { ascending: false }).limit(200);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
   });
   const { data: existingItems = [] } = useContabComprobanteItems(comprobanteId);
 
@@ -97,6 +120,7 @@ export function ComprobanteDialog({ open, onClose, comprobanteId, esVenta }: Pro
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [fechaVto, setFechaVto] = useState("");
   const [terceroId, setTerceroId] = useState<string>("");
+  const [sourceId, setSourceId] = useState<string>("");
   const [obraId, setObraId] = useState<string>("");
   const [maqId, setMaqId] = useState<string>("");
   const [observaciones, setObservaciones] = useState("");
@@ -112,7 +136,8 @@ export function ComprobanteDialog({ open, onClose, comprobanteId, esVenta }: Pro
       setNumero(existing.numero);
       setFecha(existing.fecha);
       setFechaVto(existing.fecha_vto ?? "");
-      setTerceroId(existing.tercero_id ?? "");
+      setTerceroId((existing as any).master_id ?? "");
+      setSourceId((existing as any).certificate_id ?? (existing as any).purchase_order_id ?? "");
       setObraId(existing.obra_id ?? "");
       setMaqId(existing.maquinaria_id ?? "");
       setObservaciones(existing.observaciones ?? "");
@@ -179,7 +204,8 @@ export function ComprobanteDialog({ open, onClose, comprobanteId, esVenta }: Pro
         numero,
         fecha,
         fecha_vto: fechaVto || null,
-        tercero_id: terceroId || null,
+        tercero_id: null,
+        ...(esVenta ? { cliente_id: terceroId || null, certificate_id: sourceId || null } : { proveedor_id: terceroId || null, purchase_order_id: sourceId || null }),
         es_venta: esVenta,
         estado: existing?.estado ?? "borrador",
         neto_21: totales.neto_21, iva_21: totales.iva_21,
@@ -225,6 +251,16 @@ export function ComprobanteDialog({ open, onClose, comprobanteId, esVenta }: Pro
         </DialogHeader>
 
         <div className="grid grid-cols-12 gap-3">
+          <div className="col-span-4">
+            <Label>{esVenta ? "Certificado (opcional)" : "Orden de compra (opcional)"}</Label>
+            <Select value={sourceId || "_"} onValueChange={(v) => setSourceId(v === "_" ? "" : v)} disabled={!!isReadOnly}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">— sin vínculo —</SelectItem>
+                {related.map((r: any) => <SelectItem key={r.id} value={r.id}>{r.numero} · {r.estado}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="col-span-3">
             <Label>Tipo</Label>
             <Select value={tipo} onValueChange={(v) => setTipo(v as CbteTipo)} disabled={!!isReadOnly}>
@@ -251,14 +287,14 @@ export function ComprobanteDialog({ open, onClose, comprobanteId, esVenta }: Pro
             <Input type="date" value={fechaVto} onChange={(e) => setFechaVto(e.target.value)} disabled={!!isReadOnly} />
           </div>
 
-          <div className="col-span-6">
+          <div className="col-span-4">
             <Label>{esVenta ? "Cliente" : "Proveedor"}</Label>
             <Select value={terceroId} onValueChange={setTerceroId} disabled={!!isReadOnly}>
               <SelectTrigger><SelectValue placeholder="Seleccionar tercero" /></SelectTrigger>
               <SelectContent>
-                {terceros.map((t) => (
+                {masters.map((t: any) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.razon_social}{t.cuit ? ` · ${t.cuit}` : ""}
+                    {t.nombre}{t.cuit ? ` · ${t.cuit}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
